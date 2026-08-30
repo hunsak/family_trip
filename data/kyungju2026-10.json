@@ -1,0 +1,13 @@
+{
+  "updatedAt": "2026-08-30T05:51:30.909Z",
+  "expenses": {},
+  "prepaid": [
+    {
+      "id": "p_a1aqdfm",
+      "name": "호텔비",
+      "category": "",
+      "amount": 0
+    }
+  ],
+  "packing": {}
+}
