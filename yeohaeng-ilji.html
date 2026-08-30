@@ -214,8 +214,8 @@
     </div>
 
     <div class="section-block">
-      <h3>2. GitHub 동기화 설정 (경비 데이터 전용)</h3>
-      <p class="hint">여기 입력한 저장소에는 <b>입력한 금액(경비) 데이터만</b> 저장됩니다. 여행 일정 내용은 절대 올라가지 않습니다.<br>
+      <h3>2. GitHub 동기화 설정 (입력 데이터 전용)</h3>
+      <p class="hint">여기 입력한 저장소에는 <b>입력한 금액(경비)과 준비물 체크 상태만</b> 저장됩니다. 여행 일정 내용은 절대 올라가지 않습니다.<br>
       여행마다 파일이 자동으로 나뉘어 저장되므로, 같은 저장소를 여러 번의 여행에 계속 써도 서로 섞이지 않습니다.</p>
       <div class="row2">
         <div class="field"><label>GitHub 계정(owner)</label><input id="cfgOwner" placeholder="예: hyunseok"></div>
@@ -248,13 +248,13 @@
 
   var LS_MD = 'trip_md_raw';
   var LS_CFG = 'trip_github_cfg';
-  var LS_EXPENSES = 'trip_expenses_cache';   // { [tripId]: {expenses, prepaid} }
-  var LS_PACKING = 'trip_packing_checked';   // { [tripId]: {idx: true} }
+  var LS_EXPENSES = 'trip_expenses_cache';   // { [tripId]: {expenses, prepaid, packing} }
 
   var state = {
     trip: { title:'여행일지', id:'trip', days:[], packing:[] },
     expenses: {},      // { date: { itemId: {amount, category, label} } }
     prepaid: [],        // [{id, name, category, amount}]
+    packing: {},         // { idx: true/false } - 체크 상태, GitHub로 공유됨
     github: { owner:'', repo:'', branch:'main', folder:'data', token:'' },
     githubSha: null,
     selected: null       // date string, "__TOTAL__", or "__PACKING__"
@@ -383,28 +383,18 @@
       var entry = all[state.trip.id];
       state.expenses = (entry && entry.expenses) || {};
       state.prepaid = (entry && entry.prepaid) || [];
+      state.packing = (entry && entry.packing) || {};
     }catch(e){
       state.expenses = {};
       state.prepaid = [];
+      state.packing = {};
     }
   }
   function cacheExpensesLocally(){
     var all = {};
     try{ all = JSON.parse(localStorage.getItem(LS_EXPENSES) || '{}'); }catch(e){}
-    all[state.trip.id] = { expenses: state.expenses, prepaid: state.prepaid };
+    all[state.trip.id] = { expenses: state.expenses, prepaid: state.prepaid, packing: state.packing };
     localStorage.setItem(LS_EXPENSES, JSON.stringify(all));
-  }
-  function loadPackingChecked(){
-    try{
-      var all = JSON.parse(localStorage.getItem(LS_PACKING) || '{}');
-      return all[state.trip.id] || {};
-    }catch(e){ return {}; }
-  }
-  function savePackingChecked(map){
-    var all = {};
-    try{ all = JSON.parse(localStorage.getItem(LS_PACKING) || '{}'); }catch(e){}
-    all[state.trip.id] = map;
-    localStorage.setItem(LS_PACKING, JSON.stringify(all));
   }
 
   // ---------- GitHub sync ----------
@@ -475,6 +465,7 @@
       if (data){
         state.expenses = data.expenses || {};
         state.prepaid = data.prepaid || [];
+        state.packing = data.packing || {};
         cacheExpensesLocally();
       }
       setSyncStatus('동기화 완료 · ' + new Date().toLocaleTimeString('ko-KR'));
@@ -496,7 +487,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function(){
       setSyncStatus('저장 중...');
-      githubPut({ updatedAt: new Date().toISOString(), expenses: state.expenses, prepaid: state.prepaid })
+      githubPut({ updatedAt: new Date().toISOString(), expenses: state.expenses, prepaid: state.prepaid, packing: state.packing })
         .then(function(){ setSyncStatus('저장 완료 · ' + new Date().toLocaleTimeString('ko-KR')); })
         .catch(function(err){ setSyncStatus('저장 실패: ' + err.message); });
     }, 1200);
@@ -576,7 +567,7 @@
       content.innerHTML = '<div class="empty">준비물 목록이 없습니다.<br>md 파일에 "## 준비물" 섹션을 추가해 보세요.</div>';
       return;
     }
-    var checked = loadPackingChecked();
+    var checked = state.packing || {};
     var doneCount = 0;
     var html = '<div class="packing-list">';
     state.trip.packing.forEach(function(item, idx){
@@ -588,13 +579,12 @@
       html += '</label>';
     });
     html += '</div>';
-    html += '<div class="packing-progress">'+doneCount+' / '+state.trip.packing.length+' 챙김 · 이 체크 상태는 이 기기에만 저장됩니다</div>';
+    html += '<div class="packing-progress">'+doneCount+' / '+state.trip.packing.length+' 챙김 · 가족과 공유되는 체크 상태입니다</div>';
     content.innerHTML = html;
     content.querySelectorAll('.packing-item input').forEach(function(cb){
       cb.addEventListener('change', function(){
-        var map = loadPackingChecked();
-        map[cb.dataset.idx] = cb.checked;
-        savePackingChecked(map);
+        state.packing[cb.dataset.idx] = cb.checked;
+        scheduleSave();
         renderPacking(content);
       });
     });
