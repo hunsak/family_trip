@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>여행일지</title>
+<style>
+  :root{
+    --navy:#1c2740;
+    --navy-2:#26335299;
+    --cream:#faf7f1;
+    --card:#ffffff;
+    --ink:#242a34;
+    --ink-dim:#8b8f99;
+    --coral:#ff6b52;
+    --coral-dim:#ffe3dc;
+    --sage:#4f7c82;
+    --sage-dim:#e4eeef;
+    --line:#e7e2d8;
+    --radius:14px;
+    font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);}
+  body{padding-bottom:40px;}
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:18px 16px 14px;
+    display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:20;
+  }
+  header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;}
+  header .sub{font-size:11px;color:#c4cbe0;margin-top:2px;font-weight:400;}
+  #settingsBtn{
+    background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:10px;
+    font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  #settingsBtn:active{background:rgba(255,255,255,.24);}
+
+  .date-tabs{
+    display:flex;gap:8px;overflow-x:auto;padding:10px 12px;background:var(--navy);
+    position:sticky;top:60px;z-index:19;scrollbar-width:none;
+    box-shadow:0 6px 10px -8px rgba(0,0,0,.4);
+  }
+  .date-tabs::-webkit-scrollbar{display:none;}
+  .date-tab{
+    flex:0 0 auto;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.1);
+    color:#dfe3ef;font-size:13px;font-weight:600;border:1px solid transparent;cursor:pointer;white-space:nowrap;
+  }
+  .date-tab.active{background:var(--coral);color:#fff;}
+  .date-tab.total-tab{background:transparent;border:1px solid rgba(255,255,255,.3);}
+  .date-tab.total-tab.active{background:var(--sage);border-color:var(--sage);}
+
+  main{padding:16px 14px 60px;max-width:640px;margin:0 auto;}
+
+  .empty{
+    text-align:center;color:var(--ink-dim);padding:60px 20px;font-size:14px;line-height:1.7;
+  }
+  .empty button{
+    margin-top:14px;background:var(--coral);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+
+  /* timeline */
+  .timeline{position:relative;padding-left:52px;}
+  .timeline::before{
+    content:'';position:absolute;left:20px;top:6px;bottom:6px;width:2px;background:var(--line);
+  }
+  .item{position:relative;padding:10px 0 18px;}
+  .item .time{
+    position:absolute;left:-52px;top:9px;width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--ink-dim);font-variant-numeric:tabular-nums;
+  }
+  .item::before{
+    content:'';position:absolute;left:-4px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--line);border:2px solid var(--cream);
+  }
+  .item.past{opacity:.45;}
+  .item.past .time{color:var(--ink-dim);}
+  .item.current::before{
+    background:var(--coral);width:14px;height:14px;left:-6px;top:10px;
+    box-shadow:0 0 0 5px var(--coral-dim);
+    animation:pulse 2s infinite;
+  }
+  .item.current .time{color:var(--coral);}
+  .item.current .card{border-color:var(--coral);background:#fff8f6;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 4px var(--coral-dim);}
+    50%{box-shadow:0 0 0 8px transparent;}
+    100%{box-shadow:0 0 0 4px var(--coral-dim);}
+  }
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;
+  }
+  .item-text{font-size:14.5px;line-height:1.5;font-weight:600;}
+  .item.past .item-text{font-weight:500;}
+  .cost-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .cost-row .tag{
+    font-size:11px;font-weight:700;color:var(--sage);background:var(--sage-dim);padding:3px 8px;border-radius:6px;
+  }
+  .cost-row input{
+    flex:1;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:14px;text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+  .cost-row input:focus{outline:none;border-color:var(--coral);}
+  .cost-row .won{font-size:12px;color:var(--ink-dim);}
+  .now-badge{
+    display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--coral);border-radius:6px;
+    padding:2px 6px;margin-left:6px;vertical-align:middle;
+  }
+
+  /* total */
+  .total-day{margin-bottom:18px;}
+  .total-day h3{font-size:13.5px;margin:0 0 8px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:6px;}
+  .total-day ul{list-style:none;margin:0;padding:0;}
+  .total-day li{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13.5px;}
+  .total-day li .cat{
+    font-size:10.5px;font-weight:700;color:var(--sage);background:var(--sage-dim);padding:2px 6px;border-radius:5px;flex:0 0 auto;
+  }
+  .total-day li .label{flex:1;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .total-day li .amt{font-weight:700;font-variant-numeric:tabular-nums;}
+  .day-subtotal{
+    text-align:right;font-size:13px;color:var(--ink-dim);margin-top:4px;font-weight:600;
+  }
+  .grand-total{
+    margin-top:22px;background:var(--navy);color:#fff;border-radius:var(--radius);padding:18px;
+    display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:700;
+  }
+  .grand-total span{font-size:20px;color:var(--coral);}
+
+  /* sync status */
+  #syncStatus{
+    text-align:center;font-size:11.5px;color:var(--ink-dim);padding:10px 0 0;
+  }
+
+  /* modal */
+  .modal{
+    position:fixed;inset:0;background:rgba(20,24,36,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center;
+  }
+  .modal.hidden{display:none;}
+  .sheet{
+    background:var(--cream);width:100%;max-width:640px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px 18px 30px;
+  }
+  .sheet h2{font-size:16px;margin:0 0 4px;}
+  .sheet .close{
+    float:right;background:none;border:none;font-size:20px;color:var(--ink-dim);cursor:pointer;
+  }
+  .section-block{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);}
+  .section-block h3{font-size:13.5px;margin:0 0 10px;color:var(--navy);}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:12px;color:var(--ink-dim);margin-bottom:4px;font-weight:600;}
+  .field input,.field select{
+    width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:14px;background:#fff;
+  }
+  .row2{display:flex;gap:8px;}
+  .row2 > div{flex:1;}
+  .btn{
+    border:none;border-radius:10px;padding:10px 14px;font-size:13.5px;font-weight:700;cursor:pointer;
+  }
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-accent{background:var(--coral);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn-row{display:flex;gap:8px;margin-top:10px;}
+  .prepaid-item{
+    background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;
+  }
+  .prepaid-item .row2{margin-bottom:6px;}
+  .prepaid-item .del{
+    background:none;border:none;color:var(--coral);font-size:12px;font-weight:700;cursor:pointer;float:right;
+  }
+  .hint{font-size:11.5px;color:var(--ink-dim);line-height:1.6;margin-top:6px;}
+  .file-current{font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="tripTitle">여행일지</h1>
+    <div class="sub" id="tripSub">일정을 불러오세요</div>
+  </div>
+  <button id="settingsBtn" title="설정">⚙</button>
+</header>
+
+<nav class="date-tabs" id="dateTabs"></nav>
+
+<main id="content">
+  <div class="empty">
+    불러온 여행 일정이 없습니다.<br>설정에서 여행 일정(.md) 파일을 불러와 주세요.
+  </div>
+</main>
+<div id="syncStatus"></div>
+
+<div class="modal hidden" id="settingsModal">
+  <div class="sheet">
+    <button class="close" id="closeSettings">×</button>
+    <h2>설정</h2>
+
+    <div class="section-block">
+      <h3>1. 여행 일정 불러오기 (.md)</h3>
+      <p class="hint">일정 파일은 서버/GitHub에 업로드되지 않고 이 기기에만 저장됩니다. 다른 가족 기기에서 보려면 같은 .md 파일을 각 기기에 복사해 각자 불러오세요.</p>
+      <input type="file" id="mdFileInput" accept=".md,text/markdown">
+      <div class="file-current" id="mdCurrentInfo">불러온 파일 없음</div>
+    </div>
+
+    <div class="section-block">
+      <h3>2. GitHub 동기화 설정 (경비 데이터 전용)</h3>
+      <p class="hint">여기 입력한 저장소에는 <b>입력한 금액(경비) 데이터만</b> 저장됩니다. 여행 일정 내용은 절대 올라가지 않습니다.</p>
+      <div class="row2">
+        <div class="field"><label>GitHub 계정(owner)</label><input id="cfgOwner" placeholder="예: hyunseok"></div>
+        <div class="field"><label>저장소(repo)</label><input id="cfgRepo" placeholder="예: family-trip"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>브랜치</label><input id="cfgBranch" placeholder="main"></div>
+        <div class="field"><label>저장 경로</label><input id="cfgPath" placeholder="data/expenses.json"></div>
+      </div>
+      <div class="field"><label>Personal Access Token</label><input id="cfgToken" type="password" placeholder="repo 쓰기 권한 토큰"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveGithubCfg">설정 저장</button>
+        <button class="btn btn-ghost" id="syncNowBtn">지금 동기화</button>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h3>3. 사전 예약·지불 항목 (숙소, 렌터카 등)</h3>
+      <p class="hint">일정과 상관없이 미리 지불한 금액입니다. 총금액 탭에 함께 합산됩니다.</p>
+      <div id="prepaidList"></div>
+      <button class="btn btn-ghost" id="addPrepaidBtn">+ 항목 추가</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var LS_MD = 'trip_md_raw';
+  var LS_CFG = 'trip_github_cfg';
+  var LS_EXPENSES = 'trip_expenses_cache';
+
+  var state = {
+    trip: { title:'여행일지', days:[] },
+    expenses: {},      // { date: { itemId: {amount, category, label} } }
+    prepaid: [],        // [{id, name, category, amount}]
+    github: { owner:'', repo:'', branch:'main', path:'data/expenses.json', token:'' },
+    githubSha: null,
+    selected: null       // date string or "__TOTAL__"
+  };
+
+  // ---------- utils ----------
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function nowHM(){
+    var d = new Date();
+    return pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  function formatWon(n){
+    n = Number(n)||0;
+    return n.toLocaleString('ko-KR') + '원';
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function uid(){ return 'p_' + Math.random().toString(36).slice(2,9); }
+
+  function b64EncodeUnicode(str){
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(m,p1){
+      return String.fromCharCode('0x'+p1);
+    }));
+  }
+  function b64DecodeUnicode(str){
+    return decodeURIComponent(atob(str).split('').map(function(c){
+      return '%' + ('00'+c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  }
+
+  // ---------- MD parsing ----------
+  function parseTripMD(text){
+    var lines = text.split(/\r?\n/);
+    var title = '여행일지';
+    var days = [];
+    var current = null;
+    for (var i=0;i<lines.length;i++){
+      var line = lines[i].trim();
+      if (!line) continue;
+      var m;
+      if (line[0] === '#' && line[1] !== '#' && (m = line.match(/^#\s+(.+)$/))) {
+        title = m[1].trim();
+        continue;
+      }
+      if ((m = line.match(/^##\s+(\d{4}-\d{2}-\d{2})(.*)$/))) {
+        current = { date: m[1], label: (m[1] + (m[2]||'')).trim(), items: [] };
+        days.push(current);
+        continue;
+      }
+      if (current && (m = line.match(/^-\s+(\d{2}:\d{2})\s+(.+)$/))) {
+        var txt = m[2].trim();
+        var category = null;
+        var tagMatch = txt.match(/#(\S+)\s*$/);
+        if (tagMatch){
+          category = tagMatch[1];
+          txt = txt.slice(0, tagMatch.index).trim();
+        }
+        current.items.push({ time: m[1], text: txt, category: category });
+      }
+    }
+    days.forEach(function(d){ d.items.sort(function(a,b){ return a.time.localeCompare(b.time); }); });
+    days.sort(function(a,b){ return a.date.localeCompare(b.date); });
+    return { title: title, days: days };
+  }
+
+  // ---------- persistence (local) ----------
+  function loadLocal(){
+    try{
+      var md = localStorage.getItem(LS_MD);
+      if (md) state.trip = parseTripMD(md);
+    }catch(e){}
+    try{
+      var cfg = JSON.parse(localStorage.getItem(LS_CFG) || 'null');
+      if (cfg) state.github = Object.assign(state.github, cfg);
+    }catch(e){}
+    try{
+      var cache = JSON.parse(localStorage.getItem(LS_EXPENSES) || 'null');
+      if (cache){
+        state.expenses = cache.expenses || {};
+        state.prepaid = cache.prepaid || [];
+      }
+    }catch(e){}
+  }
+  function cacheExpensesLocally(){
+    localStorage.setItem(LS_EXPENSES, JSON.stringify({ expenses: state.expenses, prepaid: state.prepaid }));
+  }
+
+  // ---------- GitHub sync ----------
+  function githubConfigured(){
+    return !!(state.github.owner && state.github.repo && state.github.token);
+  }
+
+  function githubGet(){
+    var cfg = state.github;
+    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeURIComponent(cfg.path)+'?ref='+encodeURIComponent(cfg.branch||'main');
+    return fetch(url, { headers: cfg.token ? { 'Authorization':'token '+cfg.token } : {} })
+      .then(function(res){
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error('불러오기 실패 ('+res.status+')');
+        return res.json();
+      })
+      .then(function(json){
+        if (!json) return null;
+        state.githubSha = json.sha;
+        var content = b64DecodeUnicode(json.content.replace(/\n/g,''));
+        return JSON.parse(content);
+      });
+  }
+
+  function githubPut(dataObj){
+    var cfg = state.github;
+    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeURIComponent(cfg.path);
+    var body = {
+      message: '여행 경비 업데이트 ' + new Date().toLocaleString('ko-KR'),
+      content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)),
+      branch: cfg.branch || 'main'
+    };
+    if (state.githubSha) body.sha = state.githubSha;
+    return fetch(url, {
+      method:'PUT',
+      headers:{ 'Authorization':'token '+cfg.token, 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(res){
+      if (!res.ok) return res.json().catch(function(){return {};}).then(function(err){
+        throw new Error(err.message || ('저장 실패 ('+res.status+')'));
+      });
+      return res.json();
+    }).then(function(json){
+      state.githubSha = json.content.sha;
+    });
+  }
+
+  function setSyncStatus(text){
+    document.getElementById('syncStatus').textContent = text;
+  }
+
+  function syncFromGithub(showStatus){
+    if (!githubConfigured()){
+      if (showStatus) setSyncStatus('GitHub 설정이 필요합니다 (설정 > 2번).');
+      return Promise.resolve();
+    }
+    if (showStatus) setSyncStatus('동기화 중...');
+    return githubGet().then(function(data){
+      if (data){
+        state.expenses = data.expenses || {};
+        state.prepaid = data.prepaid || [];
+        cacheExpensesLocally();
+      }
+      setSyncStatus('동기화 완료 · ' + new Date().toLocaleTimeString('ko-KR'));
+      renderCurrentView();
+      renderPrepaidList();
+    }).catch(function(err){
+      setSyncStatus('동기화 실패: ' + err.message + ' (로컬 값 사용 중)');
+    });
+  }
+
+  var saveTimer = null;
+  function scheduleSave(){
+    cacheExpensesLocally();
+    if (!githubConfigured()){
+      setSyncStatus('로컬에 저장됨 (GitHub 미설정)');
+      return;
+    }
+    setSyncStatus('저장 대기 중...');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      setSyncStatus('저장 중...');
+      githubPut({ updatedAt: new Date().toISOString(), expenses: state.expenses, prepaid: state.prepaid })
+        .then(function(){ setSyncStatus('저장 완료 · ' + new Date().toLocaleTimeString('ko-KR')); })
+        .catch(function(err){ setSyncStatus('저장 실패: ' + err.message); });
+    }, 1200);
+  }
+
+  // ---------- rendering ----------
+  function renderTabs(){
+    var wrap = document.getElementById('dateTabs');
+    wrap.innerHTML = '';
+    state.trip.days.forEach(function(day){
+      var btn = document.createElement('button');
+      btn.className = 'date-tab' + (state.selected === day.date ? ' active' : '');
+      btn.textContent = day.label.length > 12 ? day.date.slice(5) : day.label;
+      btn.onclick = function(){ state.selected = day.date; renderTabs(); renderCurrentView(); };
+      wrap.appendChild(btn);
+    });
+    var totalBtn = document.createElement('button');
+    totalBtn.className = 'date-tab total-tab' + (state.selected === '__TOTAL__' ? ' active' : '');
+    totalBtn.textContent = '총금액';
+    totalBtn.onclick = function(){ state.selected = '__TOTAL__'; renderTabs(); renderCurrentView(); };
+    wrap.appendChild(totalBtn);
+  }
+
+  function renderCurrentView(){
+    document.getElementById('tripTitle').textContent = state.trip.title || '여행일지';
+    var content = document.getElementById('content');
+    if (!state.trip.days.length){
+      content.innerHTML = '<div class="empty">불러온 여행 일정이 없습니다.<br>설정에서 여행 일정(.md) 파일을 불러와 주세요.<br><button onclick="document.getElementById(\'settingsBtn\').click()">설정 열기</button></div>';
+      document.getElementById('tripSub').textContent = '일정을 불러오세요';
+      return;
+    }
+    document.getElementById('tripSub').textContent = state.trip.days.length + '일 일정';
+
+    if (state.selected === '__TOTAL__'){
+      renderTotal(content);
+      return;
+    }
+    var day = state.trip.days.find(function(d){ return d.date === state.selected; });
+    if (!day){ day = state.trip.days[0]; state.selected = day.date; }
+    renderDay(content, day);
+  }
+
+  function renderDay(content, day){
+    var isToday = day.date === todayStr();
+    var now = nowHM();
+    var currentIdx = -1;
+    if (isToday){
+      day.items.forEach(function(item, idx){
+        if (item.time <= now) currentIdx = idx;
+      });
+    }
+    var html = '<div class="timeline">';
+    day.items.forEach(function(item, idx){
+      var cls = 'item';
+      if (isToday && idx < currentIdx) cls += ' past';
+      if (isToday && idx === currentIdx) cls += ' current';
+      var id = day.date + '_' + item.time + '_' + idx;
+      var savedEntry = (state.expenses[day.date] || {})[id];
+      var amount = savedEntry ? savedEntry.amount : '';
+      html += '<div class="'+cls+'">';
+      html += '<div class="time">'+item.time+'</div>';
+      html += '<div class="card">';
+      html += '<div class="item-text">'+escapeHtml(item.text)+(isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')+'</div>';
+      if (item.category){
+        html += '<div class="cost-row">';
+        html += '<span class="tag">'+escapeHtml(item.category)+'</span>';
+        html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+id+'" data-cat="'+escapeHtml(item.category)+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
+        html += '<span class="won">원</span>';
+        html += '</div>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    content.innerHTML = html;
+
+    var inputs = content.querySelectorAll('.cost-row input');
+    inputs.forEach(function(inp){
+      inp.addEventListener('change', function(){
+        var date = inp.dataset.date, id = inp.dataset.id, cat = inp.dataset.cat, label = inp.dataset.label;
+        var val = inp.value === '' ? null : Number(inp.value);
+        state.expenses[date] = state.expenses[date] || {};
+        if (val === null || isNaN(val) || val === 0){
+          delete state.expenses[date][id];
+        } else {
+          state.expenses[date][id] = { amount: val, category: cat, label: label };
+        }
+        scheduleSave();
+      });
+    });
+  }
+
+  function renderTotal(content){
+    var html = '';
+    var grand = 0;
+    var anyDay = false;
+    state.trip.days.forEach(function(day){
+      var dayExp = state.expenses[day.date] || {};
+      var entries = Object.keys(dayExp).map(function(k){ return dayExp[k]; }).filter(function(v){ return v && v.amount; });
+      if (!entries.length) return;
+      anyDay = true;
+      var daySum = 0;
+      html += '<section class="total-day"><h3>'+escapeHtml(day.label)+'</h3><ul>';
+      entries.forEach(function(v){
+        daySum += Number(v.amount)||0;
+        html += '<li><span class="cat">'+escapeHtml(v.category||'')+'</span><span class="label">'+escapeHtml(v.label)+'</span><span class="amt">'+formatWon(v.amount)+'</span></li>';
+      });
+      html += '</ul><div class="day-subtotal">소계: '+formatWon(daySum)+'</div></section>';
+      grand += daySum;
+    });
+    var preSum = 0;
+    if (state.prepaid.length){
+      html += '<section class="total-day prepaid"><h3>사전 예약·지불 항목</h3><ul>';
+      state.prepaid.forEach(function(p){
+        preSum += Number(p.amount)||0;
+        html += '<li><span class="cat">'+escapeHtml(p.category||'')+'</span><span class="label">'+escapeHtml(p.name)+'</span><span class="amt">'+formatWon(p.amount)+'</span></li>';
+      });
+      html += '</ul><div class="day-subtotal">소계: '+formatWon(preSum)+'</div></section>';
+      grand += preSum;
+    }
+    if (!anyDay && !state.prepaid.length){
+      html = '<div class="empty">아직 입력된 경비가 없습니다.<br>일정 화면에서 금액을 입력해 보세요.</div>';
+    } else {
+      html += '<div class="grand-total"><span>총 합계</span><span>'+formatWon(grand)+'</span></div>';
+    }
+    content.innerHTML = html;
+  }
+
+  function renderPrepaidList(){
+    var wrap = document.getElementById('prepaidList');
+    wrap.innerHTML = '';
+    state.prepaid.forEach(function(p){
+      var div = document.createElement('div');
+      div.className = 'prepaid-item';
+      div.innerHTML =
+        '<button class="del">삭제</button>' +
+        '<div class="row2">' +
+          '<div class="field"><label>항목명</label><input class="p-name" value="'+escapeHtml(p.name||'')+'" placeholder="예: 오사카 호텔 3박"></div>' +
+          '<div class="field"><label>구분</label><input class="p-cat" value="'+escapeHtml(p.category||'')+'" placeholder="예: 숙소"></div>' +
+        '</div>' +
+        '<div class="field"><label>금액(원)</label><input class="p-amt" type="number" value="'+(p.amount||'')+'"></div>';
+      wrap.appendChild(div);
+
+      div.querySelector('.del').onclick = function(){
+        state.prepaid = state.prepaid.filter(function(x){ return x.id !== p.id; });
+        renderPrepaidList();
+        scheduleSave();
+        renderCurrentView();
+      };
+      div.querySelector('.p-name').addEventListener('change', function(e){ p.name = e.target.value; scheduleSave(); renderCurrentView(); });
+      div.querySelector('.p-cat').addEventListener('change', function(e){ p.category = e.target.value; scheduleSave(); renderCurrentView(); });
+      div.querySelector('.p-amt').addEventListener('change', function(e){ p.amount = Number(e.target.value)||0; scheduleSave(); renderCurrentView(); });
+    });
+  }
+
+  // ---------- settings modal wiring ----------
+  function openSettings(){
+    document.getElementById('cfgOwner').value = state.github.owner || '';
+    document.getElementById('cfgRepo').value = state.github.repo || '';
+    document.getElementById('cfgBranch').value = state.github.branch || 'main';
+    document.getElementById('cfgPath').value = state.github.path || 'data/expenses.json';
+    document.getElementById('cfgToken').value = state.github.token || '';
+    document.getElementById('mdCurrentInfo').textContent = state.trip.days.length
+      ? ('불러온 일정: "'+state.trip.title+'" · '+state.trip.days.length+'일')
+      : '불러온 파일 없음';
+    renderPrepaidList();
+    document.getElementById('settingsModal').classList.remove('hidden');
+  }
+  function closeSettings(){
+    document.getElementById('settingsModal').classList.add('hidden');
+  }
+
+  document.getElementById('settingsBtn').onclick = openSettings;
+  document.getElementById('closeSettings').onclick = closeSettings;
+
+  document.getElementById('mdFileInput').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var text = ev.target.result;
+      localStorage.setItem(LS_MD, text);
+      state.trip = parseTripMD(text);
+      state.selected = (state.trip.days.find(function(d){return d.date===todayStr();}) || state.trip.days[0] || {}).date || null;
+      document.getElementById('mdCurrentInfo').textContent = '불러온 일정: "'+state.trip.title+'" · '+state.trip.days.length+'일';
+      renderTabs();
+      renderCurrentView();
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+
+  document.getElementById('saveGithubCfg').onclick = function(){
+    state.github = {
+      owner: document.getElementById('cfgOwner').value.trim(),
+      repo: document.getElementById('cfgRepo').value.trim(),
+      branch: document.getElementById('cfgBranch').value.trim() || 'main',
+      path: document.getElementById('cfgPath').value.trim() || 'data/expenses.json',
+      token: document.getElementById('cfgToken').value.trim()
+    };
+    localStorage.setItem(LS_CFG, JSON.stringify(state.github));
+    setSyncStatus('GitHub 설정 저장됨');
+  };
+
+  document.getElementById('syncNowBtn').onclick = function(){
+    syncFromGithub(true);
+  };
+
+  document.getElementById('addPrepaidBtn').onclick = function(){
+    state.prepaid.push({ id: uid(), name:'', category:'', amount:0 });
+    renderPrepaidList();
+  };
+
+  // ---------- boot ----------
+  loadLocal();
+  state.selected = (state.trip.days.find(function(d){return d.date===todayStr();}) || state.trip.days[0] || {}).date || null;
+  renderTabs();
+  renderCurrentView();
+  renderPrepaidList();
+  if (githubConfigured()) syncFromGithub(false);
+
+  setInterval(function(){
+    if (state.selected && state.selected !== '__TOTAL__') renderCurrentView();
+  }, 30000);
+
+})();
+</script>
+</body>
+</html>
