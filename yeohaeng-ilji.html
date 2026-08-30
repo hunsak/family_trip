@@ -168,6 +168,17 @@
   }
   .hint{font-size:11.5px;color:var(--ink-dim);line-height:1.6;margin-top:6px;}
   .file-current{font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:8px;}
+
+  /* packing */
+  .packing-list{display:flex;flex-direction:column;gap:8px;}
+  .packing-item{
+    display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:11px;padding:12px 14px;font-size:14.5px;font-weight:600;cursor:pointer;
+  }
+  .packing-item input{width:19px;height:19px;accent-color:var(--coral);flex:0 0 auto;}
+  .packing-item.checked{opacity:.5;}
+  .packing-item.checked span{text-decoration:line-through;}
+  .packing-progress{text-align:center;color:var(--ink-dim);font-size:12.5px;margin-top:14px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -196,23 +207,26 @@
 
     <div class="section-block">
       <h3>1. 여행 일정 불러오기 (.md)</h3>
-      <p class="hint">일정 파일은 서버/GitHub에 업로드되지 않고 이 기기에만 저장됩니다. 다른 가족 기기에서 보려면 같은 .md 파일을 각 기기에 복사해 각자 불러오세요.</p>
+      <p class="hint">일정 파일은 서버/GitHub에 업로드되지 않고 이 기기에만 저장됩니다. 다른 가족 기기에서 보려면 같은 .md 파일을 각 기기에 복사해 각자 불러오세요.<br>
+      md 맨 위에 <b>여행ID: 고유이름</b> 줄을 넣으면 그 이름으로, 안 넣으면 제목+첫날짜로 자동 구분됩니다.</p>
       <input type="file" id="mdFileInput" accept=".md,text/markdown">
       <div class="file-current" id="mdCurrentInfo">불러온 파일 없음</div>
     </div>
 
     <div class="section-block">
       <h3>2. GitHub 동기화 설정 (경비 데이터 전용)</h3>
-      <p class="hint">여기 입력한 저장소에는 <b>입력한 금액(경비) 데이터만</b> 저장됩니다. 여행 일정 내용은 절대 올라가지 않습니다.</p>
+      <p class="hint">여기 입력한 저장소에는 <b>입력한 금액(경비) 데이터만</b> 저장됩니다. 여행 일정 내용은 절대 올라가지 않습니다.<br>
+      여행마다 파일이 자동으로 나뉘어 저장되므로, 같은 저장소를 여러 번의 여행에 계속 써도 서로 섞이지 않습니다.</p>
       <div class="row2">
         <div class="field"><label>GitHub 계정(owner)</label><input id="cfgOwner" placeholder="예: hyunseok"></div>
         <div class="field"><label>저장소(repo)</label><input id="cfgRepo" placeholder="예: family-trip"></div>
       </div>
       <div class="row2">
         <div class="field"><label>브랜치</label><input id="cfgBranch" placeholder="main"></div>
-        <div class="field"><label>저장 경로</label><input id="cfgPath" placeholder="data/expenses.json"></div>
+        <div class="field"><label>저장 폴더</label><input id="cfgFolder" placeholder="data"></div>
       </div>
       <div class="field"><label>Personal Access Token</label><input id="cfgToken" type="password" placeholder="repo 쓰기 권한 토큰"></div>
+      <div class="hint" id="computedPathInfo"></div>
       <div class="btn-row">
         <button class="btn btn-primary" id="saveGithubCfg">설정 저장</button>
         <button class="btn btn-ghost" id="syncNowBtn">지금 동기화</button>
@@ -234,15 +248,16 @@
 
   var LS_MD = 'trip_md_raw';
   var LS_CFG = 'trip_github_cfg';
-  var LS_EXPENSES = 'trip_expenses_cache';
+  var LS_EXPENSES = 'trip_expenses_cache';   // { [tripId]: {expenses, prepaid} }
+  var LS_PACKING = 'trip_packing_checked';   // { [tripId]: {idx: true} }
 
   var state = {
-    trip: { title:'여행일지', days:[] },
+    trip: { title:'여행일지', id:'trip', days:[], packing:[] },
     expenses: {},      // { date: { itemId: {amount, category, label} } }
     prepaid: [],        // [{id, name, category, amount}]
-    github: { owner:'', repo:'', branch:'main', path:'data/expenses.json', token:'' },
+    github: { owner:'', repo:'', branch:'main', folder:'data', token:'' },
     githubSha: null,
-    selected: null       // date string or "__TOTAL__"
+    selected: null       // date string, "__TOTAL__", or "__PACKING__"
   };
 
   // ---------- utils ----------
@@ -278,25 +293,56 @@
   }
 
   // ---------- MD parsing ----------
+  function sanitizeSlug(s){
+    return (s||'').trim()
+      .replace(/[\/\\:\*\?"<>\|]/g,'')
+      .replace(/\s+/g,'_')
+      .slice(0,60) || 'trip';
+  }
+  function computeTripId(trip){
+    if (trip.explicitId) return sanitizeSlug(trip.explicitId);
+    var base = (trip.title || 'trip') + (trip.days[0] ? ('_' + trip.days[0].date.replace(/-/g,'')) : '');
+    return sanitizeSlug(base);
+  }
+
   function parseTripMD(text){
     var lines = text.split(/\r?\n/);
     var title = '여행일지';
+    var explicitId = null;
     var days = [];
+    var packing = [];
     var current = null;
+    var mode = null; // 'day' | 'packing'
     for (var i=0;i<lines.length;i++){
       var line = lines[i].trim();
       if (!line) continue;
       var m;
+      if ((m = line.match(/^여행ID\s*[:：]\s*(.+)$/))) {
+        explicitId = m[1].trim();
+        continue;
+      }
       if (line[0] === '#' && line[1] !== '#' && (m = line.match(/^#\s+(.+)$/))) {
         title = m[1].trim();
         continue;
       }
       if ((m = line.match(/^##\s+(\d{4}-\d{2}-\d{2})(.*)$/))) {
+        mode = 'day';
         current = { date: m[1], label: (m[1] + (m[2]||'')).trim(), items: [] };
         days.push(current);
         continue;
       }
-      if (current && (m = line.match(/^-\s+(\d{2}:\d{2})\s+(.+)$/))) {
+      if (line.match(/^##\s*준비물\s*$/)) {
+        mode = 'packing';
+        current = null;
+        continue;
+      }
+      if (line[0] === '#' && line[1] === '#') {
+        // 인식하지 못하는 다른 ## 헤더 -> 이후 항목은 무시
+        mode = null;
+        current = null;
+        continue;
+      }
+      if (mode === 'day' && current && (m = line.match(/^-\s+(\d{2}:\d{2})\s+(.+)$/))) {
         var txt = m[2].trim();
         var category = null;
         var tagMatch = txt.match(/#(\S+)\s*$/);
@@ -305,14 +351,21 @@
           txt = txt.slice(0, tagMatch.index).trim();
         }
         current.items.push({ time: m[1], text: txt, category: category });
+        continue;
+      }
+      if (mode === 'packing' && (m = line.match(/^-\s+(?:\[([ xX])\]\s+)?(.+)$/))) {
+        packing.push({ text: m[2].trim(), defaultChecked: (m[1]||'').toLowerCase() === 'x' });
+        continue;
       }
     }
     days.forEach(function(d){ d.items.sort(function(a,b){ return a.time.localeCompare(b.time); }); });
     days.sort(function(a,b){ return a.date.localeCompare(b.date); });
-    return { title: title, days: days };
+    var trip = { title: title, explicitId: explicitId, days: days, packing: packing };
+    trip.id = computeTripId(trip);
+    return trip;
   }
 
-  // ---------- persistence (local) ----------
+  // ---------- persistence (local, per-trip) ----------
   function loadLocal(){
     try{
       var md = localStorage.getItem(LS_MD);
@@ -322,16 +375,36 @@
       var cfg = JSON.parse(localStorage.getItem(LS_CFG) || 'null');
       if (cfg) state.github = Object.assign(state.github, cfg);
     }catch(e){}
+    loadCachedExpensesForCurrentTrip();
+  }
+  function loadCachedExpensesForCurrentTrip(){
     try{
-      var cache = JSON.parse(localStorage.getItem(LS_EXPENSES) || 'null');
-      if (cache){
-        state.expenses = cache.expenses || {};
-        state.prepaid = cache.prepaid || [];
-      }
-    }catch(e){}
+      var all = JSON.parse(localStorage.getItem(LS_EXPENSES) || '{}');
+      var entry = all[state.trip.id];
+      state.expenses = (entry && entry.expenses) || {};
+      state.prepaid = (entry && entry.prepaid) || [];
+    }catch(e){
+      state.expenses = {};
+      state.prepaid = [];
+    }
   }
   function cacheExpensesLocally(){
-    localStorage.setItem(LS_EXPENSES, JSON.stringify({ expenses: state.expenses, prepaid: state.prepaid }));
+    var all = {};
+    try{ all = JSON.parse(localStorage.getItem(LS_EXPENSES) || '{}'); }catch(e){}
+    all[state.trip.id] = { expenses: state.expenses, prepaid: state.prepaid };
+    localStorage.setItem(LS_EXPENSES, JSON.stringify(all));
+  }
+  function loadPackingChecked(){
+    try{
+      var all = JSON.parse(localStorage.getItem(LS_PACKING) || '{}');
+      return all[state.trip.id] || {};
+    }catch(e){ return {}; }
+  }
+  function savePackingChecked(map){
+    var all = {};
+    try{ all = JSON.parse(localStorage.getItem(LS_PACKING) || '{}'); }catch(e){}
+    all[state.trip.id] = map;
+    localStorage.setItem(LS_PACKING, JSON.stringify(all));
   }
 
   // ---------- GitHub sync ----------
@@ -339,9 +412,18 @@
     return !!(state.github.owner && state.github.repo && state.github.token);
   }
 
+  function githubPath(){
+    var folder = (state.github.folder || 'data').replace(/^\/+|\/+$/g,'');
+    return (folder ? folder + '/' : '') + (state.trip.id || 'trip') + '.json';
+  }
+  function encodeGithubPath(path){
+    // 폴더 구분자(/)는 그대로 두고 각 구간만 개별 인코딩 (전체를 encodeURIComponent 하면 /가 %2F로 깨짐)
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
   function githubGet(){
     var cfg = state.github;
-    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeURIComponent(cfg.path)+'?ref='+encodeURIComponent(cfg.branch||'main');
+    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeGithubPath(githubPath())+'?ref='+encodeURIComponent(cfg.branch||'main');
     return fetch(url, { headers: cfg.token ? { 'Authorization':'token '+cfg.token } : {} })
       .then(function(res){
         if (res.status === 404) return null;
@@ -358,7 +440,7 @@
 
   function githubPut(dataObj){
     var cfg = state.github;
-    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeURIComponent(cfg.path);
+    var url = 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+encodeGithubPath(githubPath());
     var body = {
       message: '여행 경비 업데이트 ' + new Date().toLocaleString('ko-KR'),
       content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)),
@@ -431,6 +513,13 @@
       btn.onclick = function(){ state.selected = day.date; renderTabs(); renderCurrentView(); };
       wrap.appendChild(btn);
     });
+    if (state.trip.packing && state.trip.packing.length){
+      var packBtn = document.createElement('button');
+      packBtn.className = 'date-tab total-tab' + (state.selected === '__PACKING__' ? ' active' : '');
+      packBtn.textContent = '준비물';
+      packBtn.onclick = function(){ state.selected = '__PACKING__'; renderTabs(); renderCurrentView(); };
+      wrap.appendChild(packBtn);
+    }
     var totalBtn = document.createElement('button');
     totalBtn.className = 'date-tab total-tab' + (state.selected === '__TOTAL__' ? ' active' : '');
     totalBtn.textContent = '총금액';
@@ -438,23 +527,77 @@
     wrap.appendChild(totalBtn);
   }
 
+  function pickInitialSelected(){
+    if (state.trip.days && state.trip.days.length){
+      var t = state.trip.days.find(function(d){ return d.date === todayStr(); });
+      return (t || state.trip.days[0]).date;
+    }
+    if (state.trip.packing && state.trip.packing.length) return '__PACKING__';
+    return null;
+  }
+
   function renderCurrentView(){
     document.getElementById('tripTitle').textContent = state.trip.title || '여행일지';
     var content = document.getElementById('content');
-    if (!state.trip.days.length){
+    var hasDays = state.trip.days && state.trip.days.length;
+    var hasPacking = state.trip.packing && state.trip.packing.length;
+
+    if (!hasDays && !hasPacking){
       content.innerHTML = '<div class="empty">불러온 여행 일정이 없습니다.<br>설정에서 여행 일정(.md) 파일을 불러와 주세요.<br><button onclick="document.getElementById(\'settingsBtn\').click()">설정 열기</button></div>';
       document.getElementById('tripSub').textContent = '일정을 불러오세요';
       return;
     }
-    document.getElementById('tripSub').textContent = state.trip.days.length + '일 일정';
+    document.getElementById('tripSub').textContent = hasDays ? (state.trip.days.length + '일 일정') : '준비물 목록';
 
     if (state.selected === '__TOTAL__'){
       renderTotal(content);
       return;
     }
-    var day = state.trip.days.find(function(d){ return d.date === state.selected; });
-    if (!day){ day = state.trip.days[0]; state.selected = day.date; }
+    if (state.selected === '__PACKING__'){
+      renderPacking(content);
+      return;
+    }
+    var day = hasDays ? state.trip.days.find(function(d){ return d.date === state.selected; }) : null;
+    if (!day){
+      if (hasDays){
+        day = state.trip.days[0];
+        state.selected = day.date;
+      } else {
+        state.selected = '__PACKING__';
+        renderPacking(content);
+        return;
+      }
+    }
     renderDay(content, day);
+  }
+
+  function renderPacking(content){
+    if (!state.trip.packing || !state.trip.packing.length){
+      content.innerHTML = '<div class="empty">준비물 목록이 없습니다.<br>md 파일에 "## 준비물" 섹션을 추가해 보세요.</div>';
+      return;
+    }
+    var checked = loadPackingChecked();
+    var doneCount = 0;
+    var html = '<div class="packing-list">';
+    state.trip.packing.forEach(function(item, idx){
+      var isChecked = checked.hasOwnProperty(idx) ? !!checked[idx] : !!item.defaultChecked;
+      if (isChecked) doneCount++;
+      html += '<label class="packing-item'+(isChecked?' checked':'')+'">';
+      html += '<input type="checkbox" data-idx="'+idx+'"'+(isChecked?' checked':'')+'>';
+      html += '<span>'+escapeHtml(item.text)+'</span>';
+      html += '</label>';
+    });
+    html += '</div>';
+    html += '<div class="packing-progress">'+doneCount+' / '+state.trip.packing.length+' 챙김 · 이 체크 상태는 이 기기에만 저장됩니다</div>';
+    content.innerHTML = html;
+    content.querySelectorAll('.packing-item input').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var map = loadPackingChecked();
+        map[cb.dataset.idx] = cb.checked;
+        savePackingChecked(map);
+        renderPacking(content);
+      });
+    });
   }
 
   function renderDay(content, day){
@@ -570,15 +713,26 @@
   }
 
   // ---------- settings modal wiring ----------
+  function refreshMdCurrentInfo(){
+    var info = document.getElementById('mdCurrentInfo');
+    if (!state.trip.days.length && !state.trip.packing.length){
+      info.textContent = '불러온 파일 없음';
+    } else {
+      info.textContent = '불러온 일정: "'+state.trip.title+'" · '+state.trip.days.length+'일'
+        + (state.trip.packing.length ? (' · 준비물 '+state.trip.packing.length+'개') : '')
+        + ' · 여행ID: '+state.trip.id;
+    }
+    var pathInfo = document.getElementById('computedPathInfo');
+    if (pathInfo) pathInfo.textContent = '이 여행의 저장 파일: ' + githubPath() + ' (여행마다 자동으로 다른 파일에 저장됩니다)';
+  }
+
   function openSettings(){
     document.getElementById('cfgOwner').value = state.github.owner || '';
     document.getElementById('cfgRepo').value = state.github.repo || '';
     document.getElementById('cfgBranch').value = state.github.branch || 'main';
-    document.getElementById('cfgPath').value = state.github.path || 'data/expenses.json';
+    document.getElementById('cfgFolder').value = state.github.folder || 'data';
     document.getElementById('cfgToken').value = state.github.token || '';
-    document.getElementById('mdCurrentInfo').textContent = state.trip.days.length
-      ? ('불러온 일정: "'+state.trip.title+'" · '+state.trip.days.length+'일')
-      : '불러온 파일 없음';
+    refreshMdCurrentInfo();
     renderPrepaidList();
     document.getElementById('settingsModal').classList.remove('hidden');
   }
@@ -597,10 +751,14 @@
       var text = ev.target.result;
       localStorage.setItem(LS_MD, text);
       state.trip = parseTripMD(text);
-      state.selected = (state.trip.days.find(function(d){return d.date===todayStr();}) || state.trip.days[0] || {}).date || null;
-      document.getElementById('mdCurrentInfo').textContent = '불러온 일정: "'+state.trip.title+'" · '+state.trip.days.length+'일';
+      state.githubSha = null;
+      loadCachedExpensesForCurrentTrip();
+      state.selected = pickInitialSelected();
+      refreshMdCurrentInfo();
       renderTabs();
       renderCurrentView();
+      renderPrepaidList();
+      if (githubConfigured()) syncFromGithub(true);
     };
     reader.readAsText(file, 'UTF-8');
   });
@@ -610,10 +768,11 @@
       owner: document.getElementById('cfgOwner').value.trim(),
       repo: document.getElementById('cfgRepo').value.trim(),
       branch: document.getElementById('cfgBranch').value.trim() || 'main',
-      path: document.getElementById('cfgPath').value.trim() || 'data/expenses.json',
+      folder: document.getElementById('cfgFolder').value.trim() || 'data',
       token: document.getElementById('cfgToken').value.trim()
     };
     localStorage.setItem(LS_CFG, JSON.stringify(state.github));
+    refreshMdCurrentInfo();
     setSyncStatus('GitHub 설정 저장됨');
   };
 
@@ -628,7 +787,7 @@
 
   // ---------- boot ----------
   loadLocal();
-  state.selected = (state.trip.days.find(function(d){return d.date===todayStr();}) || state.trip.days[0] || {}).date || null;
+  state.selected = pickInitialSelected();
   renderTabs();
   renderCurrentView();
   renderPrepaidList();
