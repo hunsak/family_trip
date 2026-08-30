@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-30T05:51:45.297Z",
+  "updatedAt": "2026-08-30T05:51:51.208Z",
   "expenses": {},
   "prepaid": [
     {
@@ -10,7 +10,7 @@
     },
     {
       "id": "p_is9u25y",
-      "name": "",
+      "name": "KTX",
       "category": "",
       "amount": 0
     }
