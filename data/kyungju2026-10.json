@@ -1,11 +1,17 @@
 {
-  "updatedAt": "2026-08-30T05:51:35.448Z",
+  "updatedAt": "2026-08-30T05:51:45.297Z",
   "expenses": {},
   "prepaid": [
     {
       "id": "p_a1aqdfm",
       "name": "호텔비",
       "category": "숙박",
+      "amount": 375295
+    },
+    {
+      "id": "p_is9u25y",
+      "name": "",
+      "category": "",
       "amount": 0
     }
   ],
