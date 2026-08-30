@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-30T05:52:15.524Z",
+  "updatedAt": "2026-08-30T05:52:21.679Z",
   "expenses": {},
   "prepaid": [
     {
@@ -17,7 +17,7 @@
     {
       "id": "p_1dxjqnc",
       "name": "렌터카",
-      "category": "",
+      "category": "교통비",
       "amount": 0
     }
   ],
