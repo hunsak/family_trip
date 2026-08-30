@@ -112,6 +112,20 @@
   }
   .cost-row input:focus{outline:none;border-color:var(--coral);}
   .cost-row .won{font-size:12px;color:var(--ink-dim);}
+  .addr-row{
+    display:flex;align-items:center;gap:6px;margin-top:6px;padding:6px 8px;
+    background:var(--sage-dim);border-radius:8px;cursor:pointer;user-select:none;
+  }
+  .addr-row .addr-icon{font-size:12px;flex:0 0 auto;}
+  .addr-row .addr-text{
+    flex:1;font-size:12.5px;color:var(--sage);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .addr-row .addr-copy{
+    flex:0 0 auto;font-size:10.5px;font-weight:700;color:#fff;background:var(--sage);border-radius:5px;padding:2px 7px;
+  }
+  .addr-row:active{opacity:.7;}
+  .addr-row.copied{background:var(--coral-dim);}
+  .addr-row.copied .addr-copy{background:var(--coral);}
   .now-badge{
     display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--coral);border-radius:6px;
     padding:2px 6px;margin-left:6px;vertical-align:middle;
@@ -360,7 +374,11 @@
           category = tagMatch[1];
           txt = txt.slice(0, tagMatch.index).trim();
         }
-        current.items.push({ time: m[1], text: txt, category: category });
+        current.items.push({ time: m[1], text: txt, category: category, address: null });
+        continue;
+      }
+      if (mode === 'day' && current && current.items.length && (m = line.match(/^주소\s*[:：]\s*(.+)$/))) {
+        current.items[current.items.length - 1].address = m[1].trim();
         continue;
       }
       if (mode === 'packing' && (m = line.match(/^-\s+(?:\[([ xX])\]\s+)?(.+)$/))) {
@@ -621,6 +639,11 @@
       html += '<div class="time">'+item.time+'</div>';
       html += '<div class="card">';
       html += '<div class="item-text">'+escapeHtml(item.text)+(isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')+'</div>';
+      if (item.address){
+        html += '<div class="addr-row" data-addr="'+escapeHtml(item.address)+'">';
+        html += '<span class="addr-icon">\uD83D\uDCCD</span><span class="addr-text">'+escapeHtml(item.address)+'</span><span class="addr-copy">복사</span>';
+        html += '</div>';
+      }
       if (item.category){
         html += '<div class="cost-row">';
         html += '<span class="tag">'+escapeHtml(item.category)+'</span>';
@@ -647,6 +670,43 @@
         scheduleSave();
       });
     });
+
+    content.querySelectorAll('.addr-row').forEach(function(row){
+      row.addEventListener('click', function(){
+        var text = row.dataset.addr;
+        copyToClipboard(text).then(function(ok){
+          var hint = row.querySelector('.addr-copy');
+          var original = hint.textContent;
+          hint.textContent = ok ? '복사됨' : '실패';
+          row.classList.add('copied');
+          setTimeout(function(){
+            hint.textContent = original;
+            row.classList.remove('copied');
+          }, 1200);
+        });
+      });
+    });
+  }
+
+  function copyToClipboard(text){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).then(function(){ return true; }).catch(function(){ return fallbackCopy(text); });
+    }
+    return Promise.resolve(fallbackCopy(text));
+  }
+  function fallbackCopy(text){
+    try{
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){ return false; }
   }
 
   function renderTotal(content){
