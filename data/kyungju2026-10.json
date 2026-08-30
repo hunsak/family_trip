@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-30T05:51:56.143Z",
+  "updatedAt": "2026-08-30T05:52:10.785Z",
   "expenses": {},
   "prepaid": [
     {
@@ -12,6 +12,12 @@
       "id": "p_is9u25y",
       "name": "KTX",
       "category": "교통비",
+      "amount": 79990
+    },
+    {
+      "id": "p_1dxjqnc",
+      "name": "",
+      "category": "",
       "amount": 0
     }
   ],
