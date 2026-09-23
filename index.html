@@ -126,6 +126,24 @@
   .addr-row:active{opacity:.7;}
   .addr-row.copied{background:var(--coral-dim);}
   .addr-row.copied .addr-copy{background:var(--coral);}
+  .item.adhoc .card{border-style:dashed;border-color:var(--sage);}
+  .adhoc-badge{
+    display:inline-block;font-size:10.5px;font-weight:700;color:var(--sage);background:var(--sage-dim);border-radius:6px;
+    padding:2px 6px;margin-left:6px;vertical-align:middle;
+  }
+  .adhoc-del{
+    flex:0 0 auto;background:none;border:none;color:var(--ink-dim);font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;
+  }
+  .add-adhoc-btn{
+    display:block;width:100%;margin-top:6px;background:none;border:1.5px dashed var(--line);color:var(--ink-dim);
+    border-radius:12px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;
+  }
+  .add-adhoc-btn:active{background:#fff;}
+  .adhoc-form{
+    margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;
+  }
+  .adhoc-form.hidden{display:none;}
+  .add-adhoc-btn.hidden{display:none;}
   .now-badge{
     display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--coral);border-radius:6px;
     padding:2px 6px;margin-left:6px;vertical-align:middle;
@@ -618,56 +636,120 @@
     });
   }
 
+  function collectKnownCategories(){
+    var set = {};
+    state.trip.days.forEach(function(d){
+      d.items.forEach(function(it){ if (it.category) set[it.category] = true; });
+    });
+    ['식비','관람료','교통','기타'].forEach(function(c){ set[c] = true; });
+    return Object.keys(set);
+  }
+
   function renderDay(content, day){
     var isToday = day.date === todayStr();
     var now = nowHM();
+    var dayExp = state.expenses[day.date] || {};
+
+    var scheduleItems = day.items.map(function(item, idx){
+      return {
+        kind: 'schedule',
+        time: item.time,
+        text: item.text,
+        category: item.category,
+        address: item.address,
+        id: day.date + '_' + item.time + '_' + idx
+      };
+    });
+    var adhocItems = Object.keys(dayExp).filter(function(id){
+      return dayExp[id] && dayExp[id].adhoc;
+    }).map(function(id){
+      var v = dayExp[id];
+      return { kind:'adhoc', time: v.time || '00:00', text: v.label, category: v.category, address: null, id: id };
+    });
+    var combined = scheduleItems.concat(adhocItems);
+    combined.sort(function(a,b){ return a.time.localeCompare(b.time); });
+
     var currentIdx = -1;
     if (isToday){
-      day.items.forEach(function(item, idx){
-        if (item.time <= now) currentIdx = idx;
-      });
+      combined.forEach(function(it, idx){ if (it.time <= now) currentIdx = idx; });
     }
+
     var html = '<div class="timeline">';
-    day.items.forEach(function(item, idx){
-      var cls = 'item';
+    combined.forEach(function(item, idx){
+      var cls = 'item' + (item.kind === 'adhoc' ? ' adhoc' : '');
       if (isToday && idx < currentIdx) cls += ' past';
       if (isToday && idx === currentIdx) cls += ' current';
-      var id = day.date + '_' + item.time + '_' + idx;
-      var savedEntry = (state.expenses[day.date] || {})[id];
+      var savedEntry = dayExp[item.id];
       var amount = savedEntry ? savedEntry.amount : '';
       html += '<div class="'+cls+'">';
       html += '<div class="time">'+item.time+'</div>';
       html += '<div class="card">';
-      html += '<div class="item-text">'+escapeHtml(item.text)+(isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')+'</div>';
+      html += '<div class="item-text">'+escapeHtml(item.text)+(item.kind==='adhoc' ? '<span class="adhoc-badge">즉흥 지출</span>' : '')+(isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')+'</div>';
       if (item.address){
         html += '<div class="addr-row" data-addr="'+escapeHtml(item.address)+'">';
         html += '<span class="addr-icon">\uD83D\uDCCD</span><span class="addr-text">'+escapeHtml(item.address)+'</span><span class="addr-copy">복사</span>';
         html += '</div>';
       }
-      if (item.category){
+      if (item.kind === 'adhoc'){
+        html += '<div class="cost-row">';
+        html += '<span class="tag">'+escapeHtml(item.category||'기타')+'</span>';
+        html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+item.id+'" data-cat="'+escapeHtml(item.category||'기타')+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
+        html += '<span class="won">원</span>';
+        html += '<button class="adhoc-del" data-date="'+day.date+'" data-id="'+item.id+'" title="삭제">×</button>';
+        html += '</div>';
+      } else if (item.category){
         html += '<div class="cost-row">';
         html += '<span class="tag">'+escapeHtml(item.category)+'</span>';
-        html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+id+'" data-cat="'+escapeHtml(item.category)+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
+        html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+item.id+'" data-cat="'+escapeHtml(item.category)+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
         html += '<span class="won">원</span>';
         html += '</div>';
       }
       html += '</div></div>';
     });
     html += '</div>';
+
+    html += '<button class="add-adhoc-btn" id="addAdhocBtn">+ 예정에 없던 지출 추가</button>';
+    html += '<div class="adhoc-form hidden" id="adhocForm">';
+    html += '  <div class="field"><label>시간</label><input type="time" id="adhocTime" value="'+nowHM()+'"></div>';
+    html += '  <div class="field"><label>내용</label><input type="text" id="adhocText" placeholder="예: 편의점 간식"></div>';
+    html += '  <div class="field"><label>구분</label><input type="text" id="adhocCat" list="categoryOptions" placeholder="예: 식비" value="기타"></div>';
+    html += '  <div class="field"><label>금액(원)</label><input type="number" inputmode="numeric" id="adhocAmount" placeholder="0"></div>';
+    html += '  <datalist id="categoryOptions">' + collectKnownCategories().map(function(c){ return '<option value="'+escapeHtml(c)+'">'; }).join('') + '</datalist>';
+    html += '  <div class="btn-row"><button class="btn btn-accent" id="adhocSaveBtn">저장</button><button class="btn btn-ghost" id="adhocCancelBtn">취소</button></div>';
+    html += '</div>';
+
     content.innerHTML = html;
 
-    var inputs = content.querySelectorAll('.cost-row input');
+    var inputs = content.querySelectorAll('.cost-row input[type=number]');
     inputs.forEach(function(inp){
       inp.addEventListener('change', function(){
         var date = inp.dataset.date, id = inp.dataset.id, cat = inp.dataset.cat, label = inp.dataset.label;
         var val = inp.value === '' ? null : Number(inp.value);
         state.expenses[date] = state.expenses[date] || {};
+        var existing = state.expenses[date][id];
         if (val === null || isNaN(val) || val === 0){
-          delete state.expenses[date][id];
+          if (existing && existing.adhoc){
+            existing.amount = 0; // keep the entry (label/time/category) but zero amount; user can delete via × if unwanted
+          } else {
+            delete state.expenses[date][id];
+          }
         } else {
-          state.expenses[date][id] = { amount: val, category: cat, label: label };
+          if (existing && existing.adhoc){
+            existing.amount = val;
+          } else {
+            state.expenses[date][id] = { amount: val, category: cat, label: label };
+          }
         }
         scheduleSave();
+      });
+    });
+
+    content.querySelectorAll('.adhoc-del').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var date = btn.dataset.date, id = btn.dataset.id;
+        if (state.expenses[date]) delete state.expenses[date][id];
+        scheduleSave();
+        renderDay(content, day);
       });
     });
 
@@ -686,6 +768,38 @@
         });
       });
     });
+
+    var addBtn = content.querySelector('#addAdhocBtn');
+    var form = content.querySelector('#adhocForm');
+    if (addBtn){
+      addBtn.addEventListener('click', function(){
+        form.classList.remove('hidden');
+        addBtn.classList.add('hidden');
+        content.querySelector('#adhocText').focus();
+      });
+    }
+    var cancelBtn = content.querySelector('#adhocCancelBtn');
+    if (cancelBtn){
+      cancelBtn.addEventListener('click', function(){ renderDay(content, day); });
+    }
+    var saveBtn = content.querySelector('#adhocSaveBtn');
+    if (saveBtn){
+      saveBtn.addEventListener('click', function(){
+        var time = content.querySelector('#adhocTime').value || nowHM();
+        var text = content.querySelector('#adhocText').value.trim();
+        var cat = content.querySelector('#adhocCat').value.trim() || '기타';
+        var amount = Number(content.querySelector('#adhocAmount').value) || 0;
+        if (!text){
+          content.querySelector('#adhocText').focus();
+          return;
+        }
+        var id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+        state.expenses[day.date] = state.expenses[day.date] || {};
+        state.expenses[day.date][id] = { amount: amount, category: cat, label: text, time: time, adhoc: true };
+        scheduleSave();
+        renderDay(content, day);
+      });
+    }
   }
 
   function copyToClipboard(text){
