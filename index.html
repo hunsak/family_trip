@@ -142,6 +142,13 @@
   .adhoc-form{
     margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;
   }
+  .adhoc-form .field{overflow:hidden;}
+  .adhoc-form input[type="time"]{
+    -webkit-min-logical-width: calc(100% + 30px);
+    min-width:0;
+    box-sizing:border-box;
+    font-size:14px;
+  }
   .adhoc-form.hidden{display:none;}
   .add-adhoc-btn.hidden{display:none;}
   .now-badge{
