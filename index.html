@@ -143,12 +143,6 @@
     margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;
   }
   .adhoc-form .field{overflow:hidden;}
-  .adhoc-form input[type="time"]{
-    -webkit-min-logical-width: calc(100% + 30px);
-    min-width:0;
-    box-sizing:border-box;
-    font-size:16px;
-  }
   .adhoc-form.hidden{display:none;}
   .add-adhoc-btn.hidden{display:none;}
   .now-badge{
@@ -717,7 +711,7 @@
 
     html += '<button class="add-adhoc-btn" id="addAdhocBtn">+ 예정에 없던 지출 추가</button>';
     html += '<div class="adhoc-form hidden" id="adhocForm">';
-    html += '  <div class="field"><label>시간</label><input type="time" id="adhocTime" value="'+nowHM()+'"></div>';
+    html += '  <div class="field"><label>시간</label><input type="text" inputmode="numeric" id="adhocTime" placeholder="09:30" maxlength="5" value="'+nowHM()+'"></div>';
     html += '  <div class="field"><label>내용</label><input type="text" id="adhocText" placeholder="예: 편의점 간식"></div>';
     html += '  <div class="field"><label>구분</label><input type="text" id="adhocCat" list="categoryOptions" placeholder="예: 식비" value="기타"></div>';
     html += '  <div class="field"><label>금액(원)</label><input type="number" inputmode="numeric" id="adhocAmount" placeholder="0"></div>';
@@ -778,11 +772,24 @@
 
     var addBtn = content.querySelector('#addAdhocBtn');
     var form = content.querySelector('#adhocForm');
+    var timeInput = content.querySelector('#adhocTime');
+    if (timeInput){
+      timeInput.addEventListener('input', function(){
+        var digits = timeInput.value.replace(/\D/g,'').slice(0,4);
+        timeInput.value = digits.length > 2 ? (digits.slice(0,2) + ':' + digits.slice(2)) : digits;
+      });
+    }
     if (addBtn){
       addBtn.addEventListener('click', function(){
         form.classList.remove('hidden');
         addBtn.classList.add('hidden');
-        content.querySelector('#adhocText').focus();
+        setTimeout(function(){
+          content.querySelector('#adhocText').focus();
+          form.scrollIntoView({ behavior:'smooth', block:'center' });
+        }, 50);
+        setTimeout(function(){
+          form.scrollIntoView({ behavior:'smooth', block:'center' });
+        }, 400);
       });
     }
     var cancelBtn = content.querySelector('#adhocCancelBtn');
@@ -792,7 +799,8 @@
     var saveBtn = content.querySelector('#adhocSaveBtn');
     if (saveBtn){
       saveBtn.addEventListener('click', function(){
-        var time = content.querySelector('#adhocTime').value || nowHM();
+        var rawTime = content.querySelector('#adhocTime').value.trim();
+        var time = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : nowHM();
         var text = content.querySelector('#adhocText').value.trim();
         var cat = content.querySelector('#adhocCat').value.trim() || '기타';
         var amount = Number(content.querySelector('#adhocAmount').value) || 0;
