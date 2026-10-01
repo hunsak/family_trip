@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-21T23:27:35.968Z",
+  "updatedAt": "2026-10-01T11:27:18.104Z",
   "expenses": {},
   "prepaid": [
     {
@@ -21,5 +21,7 @@
       "amount": 180420
     }
   ],
-  "packing": {}
+  "packing": {
+    "20": true
+  }
 }
