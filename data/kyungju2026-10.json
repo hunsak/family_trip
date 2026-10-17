@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-17T11:49:28.137Z",
+  "updatedAt": "2026-10-17T11:49:34.947Z",
   "expenses": {},
   "prepaid": [
     {
@@ -31,6 +31,7 @@
     "12": true,
     "13": true,
     "20": false,
+    "22": true,
     "24": false
   }
 }
