@@ -216,6 +216,11 @@
   .file-current{font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:8px;}
 
   /* packing */
+  .packing-group{margin-bottom:18px;}
+  .packing-group h3{
+    font-size:12.5px;font-weight:700;color:var(--sage);background:var(--sage-dim);
+    display:inline-block;padding:3px 10px;border-radius:999px;margin:0 0 8px;
+  }
   .packing-list{display:flex;flex-direction:column;gap:8px;}
   .packing-item{
     display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
@@ -361,6 +366,7 @@
     var days = [];
     var packing = [];
     var current = null;
+    var packingCategory = null;
     var mode = null; // 'day' | 'packing'
     for (var i=0;i<lines.length;i++){
       var line = lines[i].trim();
@@ -383,12 +389,18 @@
       if (line.match(/^##\s*준비물\s*$/)) {
         mode = 'packing';
         current = null;
+        packingCategory = null;
+        continue;
+      }
+      if (mode === 'packing' && line[0] === '#' && line[1] === '#' && line[2] === '#') {
+        packingCategory = line.replace(/^#+\s*/, '').trim();
         continue;
       }
       if (line[0] === '#' && line[1] === '#') {
         // 인식하지 못하는 다른 ## 헤더 -> 이후 항목은 무시
         mode = null;
         current = null;
+        packingCategory = null;
         continue;
       }
       if (mode === 'day' && current && (m = line.match(/^-\s+(\d{2}:\d{2})\s+(.+)$/))) {
@@ -407,7 +419,7 @@
         continue;
       }
       if (mode === 'packing' && (m = line.match(/^-\s+(?:\[([ xX])\]\s+)?(.+)$/))) {
-        packing.push({ text: m[2].trim(), defaultChecked: (m[1]||'').toLowerCase() === 'x' });
+        packing.push({ text: m[2].trim(), defaultChecked: (m[1]||'').toLowerCase() === 'x', category: packingCategory });
         continue;
       }
     }
@@ -530,10 +542,13 @@
   }
 
   var saveTimer = null;
+  var pendingLocalChange = false;
   function scheduleSave(){
     cacheExpensesLocally();
+    pendingLocalChange = true;
     if (!githubConfigured()){
       setSyncStatus('로컬에 저장됨 (GitHub 미설정)');
+      pendingLocalChange = false;
       return;
     }
     setSyncStatus('저장 대기 중...');
@@ -541,8 +556,14 @@
     saveTimer = setTimeout(function(){
       setSyncStatus('저장 중...');
       githubPut({ updatedAt: new Date().toISOString(), expenses: state.expenses, prepaid: state.prepaid, packing: state.packing })
-        .then(function(){ setSyncStatus('저장 완료 · ' + new Date().toLocaleTimeString('ko-KR')); })
-        .catch(function(err){ setSyncStatus('저장 실패: ' + err.message); });
+        .then(function(){
+          setSyncStatus('저장 완료 · ' + new Date().toLocaleTimeString('ko-KR'));
+          pendingLocalChange = false;
+        })
+        .catch(function(err){
+          setSyncStatus('저장 실패: ' + err.message);
+          pendingLocalChange = false;
+        });
     }, 1200);
   }
 
@@ -622,16 +643,30 @@
     }
     var checked = state.packing || {};
     var doneCount = 0;
-    var html = '<div class="packing-list">';
+
+    // 원래 배열 순서(=idx, 체크 상태 저장 키)는 그대로 둔 채 표시할 때만 카테고리로 묶음
+    var groupOrder = [];
+    var groupMap = {};
     state.trip.packing.forEach(function(item, idx){
-      var isChecked = checked.hasOwnProperty(idx) ? !!checked[idx] : !!item.defaultChecked;
-      if (isChecked) doneCount++;
-      html += '<label class="packing-item'+(isChecked?' checked':'')+'">';
-      html += '<input type="checkbox" data-idx="'+idx+'"'+(isChecked?' checked':'')+'>';
-      html += '<span>'+escapeHtml(item.text)+'</span>';
-      html += '</label>';
+      var cat = item.category || '기타';
+      if (!groupMap[cat]){ groupMap[cat] = []; groupOrder.push(cat); }
+      groupMap[cat].push(idx);
     });
-    html += '</div>';
+
+    var html = '';
+    groupOrder.forEach(function(cat){
+      html += '<div class="packing-group"><h3>'+escapeHtml(cat)+'</h3><div class="packing-list">';
+      groupMap[cat].forEach(function(idx){
+        var item = state.trip.packing[idx];
+        var isChecked = checked.hasOwnProperty(idx) ? !!checked[idx] : !!item.defaultChecked;
+        if (isChecked) doneCount++;
+        html += '<label class="packing-item'+(isChecked?' checked':'')+'">';
+        html += '<input type="checkbox" data-idx="'+idx+'"'+(isChecked?' checked':'')+'>';
+        html += '<span>'+escapeHtml(item.text)+'</span>';
+        html += '</label>';
+      });
+      html += '</div></div>';
+    });
     html += '<div class="packing-progress">'+doneCount+' / '+state.trip.packing.length+' 챙김 · 가족과 공유되는 체크 상태입니다</div>';
     content.innerHTML = html;
     content.querySelectorAll('.packing-item input').forEach(function(cb){
@@ -1013,14 +1048,15 @@
 
   // 앱이 다시 화면에 보일 때(백그라운드에서 돌아올 때) 자동으로 최신 값 동기화
   document.addEventListener('visibilitychange', function(){
-    if (document.visibilityState === 'visible' && githubConfigured() && !isEditingNow()){
+    if (document.visibilityState === 'visible' && githubConfigured() && !isEditingNow() && !pendingLocalChange){
       syncFromGithub(false);
     }
   });
 
-  // 입력 중이 아닐 때 주기적으로 최신 값 자동 동기화 (가족이 체크/입력한 내용 반영)
+  // 입력 중이거나 방금 바꾼 값이 아직 저장 중이 아닐 때만 주기적으로 최신 값 자동 동기화
+  // (저장 중에 덮어쓰면 방금 체크한 내용이 다시 풀려버리는 문제를 막기 위함)
   setInterval(function(){
-    if (githubConfigured() && !isEditingNow()) syncFromGithub(false);
+    if (githubConfigured() && !isEditingNow() && !pendingLocalChange) syncFromGithub(false);
   }, 20000);
 
   setInterval(function(){
