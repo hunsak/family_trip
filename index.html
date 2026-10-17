@@ -32,21 +32,24 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);}
-  body{padding-bottom:40px;}
+  body{padding-bottom:calc(40px + env(safe-area-inset-bottom, 0px));}
   header{
     background:var(--navy);
     color:#fff;
-    padding:18px 16px 14px;
+    padding:calc(18px + env(safe-area-inset-top, 0px)) 16px 14px;
     display:flex;align-items:center;justify-content:space-between;
     position:sticky;top:0;z-index:20;
   }
   header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;}
   header .sub{font-size:11px;color:#c4cbe0;margin-top:2px;font-weight:400;}
-  #settingsBtn{
+  .header-btns{display:flex;gap:8px;}
+  #settingsBtn,#refreshBtn{
     background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:10px;
     font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
-  #settingsBtn:active{background:rgba(255,255,255,.24);}
+  #settingsBtn:active,#refreshBtn:active{background:rgba(255,255,255,.24);}
+  #refreshBtn.spinning{animation:spin .8s linear;}
+  @keyframes spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
 
   .date-tabs{
     display:flex;gap:8px;overflow-x:auto;padding:10px 12px;background:var(--navy);
@@ -226,12 +229,15 @@
 </head>
 <body>
 
-<header>
+<header id="appHeader">
   <div>
     <h1 id="tripTitle">여행일지</h1>
     <div class="sub" id="tripSub">일정을 불러오세요</div>
   </div>
-  <button id="settingsBtn" title="설정">⚙</button>
+  <div class="header-btns">
+    <button id="refreshBtn" title="새로고침">⟳</button>
+    <button id="settingsBtn" title="설정">⚙</button>
+  </div>
 </header>
 
 <nav class="date-tabs" id="dateTabs"></nav>
@@ -969,6 +975,25 @@
     syncFromGithub(true);
   };
 
+  document.getElementById('refreshBtn').onclick = function(){
+    var btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    setTimeout(function(){ btn.classList.remove('spinning'); }, 800);
+    syncFromGithub(true);
+  };
+
+  function isEditingNow(){
+    var active = document.activeElement;
+    var content = document.getElementById('content');
+    return !!(active && content && content.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+  }
+
+  function adjustStickyOffset(){
+    var header = document.getElementById('appHeader');
+    var tabs = document.getElementById('dateTabs');
+    if (header && tabs) tabs.style.top = header.offsetHeight + 'px';
+  }
+
   document.getElementById('addPrepaidBtn').onclick = function(){
     state.prepaid.push({ id: uid(), name:'', category:'', amount:0 });
     renderPrepaidList();
@@ -980,7 +1005,23 @@
   renderTabs();
   renderCurrentView();
   renderPrepaidList();
+  adjustStickyOffset();
   if (githubConfigured()) syncFromGithub(false);
+
+  window.addEventListener('resize', adjustStickyOffset);
+  window.addEventListener('orientationchange', function(){ setTimeout(adjustStickyOffset, 300); });
+
+  // 앱이 다시 화면에 보일 때(백그라운드에서 돌아올 때) 자동으로 최신 값 동기화
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && githubConfigured() && !isEditingNow()){
+      syncFromGithub(false);
+    }
+  });
+
+  // 입력 중이 아닐 때 주기적으로 최신 값 자동 동기화 (가족이 체크/입력한 내용 반영)
+  setInterval(function(){
+    if (githubConfigured() && !isEditingNow()) syncFromGithub(false);
+  }, 20000);
 
   setInterval(function(){
     if (state.selected && state.selected !== '__TOTAL__') renderCurrentView();
