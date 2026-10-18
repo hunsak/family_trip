@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-18T05:04:23.926Z",
+  "updatedAt": "2026-10-18T05:05:13.619Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -28,6 +28,13 @@
         "category": "기타",
         "label": "주차비",
         "time": "12:47",
+        "adhoc": true
+      },
+      "adhoc_1792299912298_mxqm": {
+        "amount": 32000,
+        "category": "식비",
+        "label": "호로록곳간",
+        "time": "14:04",
         "adhoc": true
       }
     }
