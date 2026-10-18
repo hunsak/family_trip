@@ -1,11 +1,18 @@
 {
-  "updatedAt": "2026-10-18T00:40:49.900Z",
+  "updatedAt": "2026-10-18T00:40:51.624Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
         "amount": 15800,
         "category": "교통비",
         "label": "택시비",
+        "time": "09:40",
+        "adhoc": true
+      },
+      "adhoc_1792284050343_zkbd": {
+        "amount": 7000,
+        "category": "식비",
+        "label": "아침식사",
         "time": "09:40",
         "adhoc": true
       }
