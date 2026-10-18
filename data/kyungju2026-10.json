@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-18T00:44:20.744Z",
+  "updatedAt": "2026-10-18T03:47:50.429Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -21,6 +21,13 @@
         "category": "교통비",
         "label": "택시비추가",
         "time": "09:43",
+        "adhoc": true
+      },
+      "adhoc_1792295269024_h0cp": {
+        "amount": 2500,
+        "category": "기타",
+        "label": "주차비",
+        "time": "12:47",
         "adhoc": true
       }
     }
