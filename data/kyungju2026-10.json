@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-18T03:47:50.429Z",
+  "updatedAt": "2026-10-18T04:40:06.709Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -28,6 +28,13 @@
         "category": "기타",
         "label": "주차비",
         "time": "12:47",
+        "adhoc": true
+      },
+      "adhoc_1792298405352_ljd9": {
+        "amount": 30000,
+        "category": "삭비",
+        "label": "호로롯막국수",
+        "time": "13:39",
         "adhoc": true
       }
     }
