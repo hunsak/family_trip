@@ -1,6 +1,16 @@
 {
-  "updatedAt": "2026-10-17T14:04:25.087Z",
-  "expenses": {},
+  "updatedAt": "2026-10-18T00:40:49.900Z",
+  "expenses": {
+    "2026-10-18": {
+      "adhoc_1792284048307_9741": {
+        "amount": 15800,
+        "category": "교통비",
+        "label": "택시비",
+        "time": "09:40",
+        "adhoc": true
+      }
+    }
+  },
   "prepaid": [
     {
       "id": "p_a1aqdfm",
