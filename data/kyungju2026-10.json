@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-18T05:39:37.420Z",
+  "updatedAt": "2026-10-18T06:48:36.819Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -56,6 +56,13 @@
         "category": "관람비",
         "label": "천마총",
         "time": "14:39",
+        "adhoc": true
+      },
+      "adhoc_1792306115553_gsth": {
+        "amount": 9000,
+        "category": "간식비",
+        "label": "황남옥수수",
+        "time": "15:47",
         "adhoc": true
       }
     }
