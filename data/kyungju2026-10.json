@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T02:10:36.129Z",
+  "updatedAt": "2026-10-19T02:26:00.452Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -98,6 +98,13 @@
         "category": "기념품",
         "label": "석굴암 염주",
         "time": "11:10",
+        "adhoc": true
+      },
+      "adhoc_1792376758691_ypea": {
+        "amount": 2000,
+        "category": "주차요금",
+        "label": "석굴암",
+        "time": "11:25",
         "adhoc": true
       }
     }
