@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T08:22:16.838Z",
+  "updatedAt": "2026-10-19T09:01:13.285Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -166,6 +166,13 @@
         "category": "식비",
         "label": "천마맷돌순두부",
         "time": "17:21",
+        "adhoc": true
+      },
+      "adhoc_1792400471920_7sgi": {
+        "amount": 1900,
+        "category": "기타",
+        "label": "주차비",
+        "time": "18:00",
         "adhoc": true
       }
     }
