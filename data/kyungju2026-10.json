@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T07:44:33.671Z",
+  "updatedAt": "2026-10-19T07:57:45.342Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -138,6 +138,13 @@
         "category": "간식비",
         "label": "황남쫀드기",
         "time": "16:44",
+        "adhoc": true
+      },
+      "adhoc_1792396664005_rmqy": {
+        "amount": 21000,
+        "category": "캐리커처",
+        "label": "캐리커처",
+        "time": "16:57",
         "adhoc": true
       }
     }
