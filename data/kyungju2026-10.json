@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T02:26:00.452Z",
+  "updatedAt": "2026-10-19T02:44:07.794Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -105,6 +105,13 @@
         "category": "주차요금",
         "label": "석굴암",
         "time": "11:25",
+        "adhoc": true
+      },
+      "adhoc_1792377846051_qkls": {
+        "amount": 2000,
+        "category": "기타",
+        "label": "주차요금",
+        "time": "11:43",
         "adhoc": true
       }
     }
