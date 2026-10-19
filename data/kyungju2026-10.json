@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T07:38:36.942Z",
+  "updatedAt": "2026-10-19T07:44:33.671Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -131,6 +131,13 @@
         "category": "기타",
         "label": "십원빵",
         "time": "16:38",
+        "adhoc": true
+      },
+      "adhoc_1792395872365_b9ei": {
+        "amount": 4000,
+        "category": "간식비",
+        "label": "황남쫀드기",
+        "time": "16:44",
         "adhoc": true
       }
     }
