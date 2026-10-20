@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-20T01:05:53.124Z",
+  "updatedAt": "2026-10-20T03:10:34.232Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -194,6 +194,13 @@
         "category": "관람",
         "label": "스누피전시회",
         "time": "10:05",
+        "adhoc": true
+      },
+      "adhoc_1792465832898_f9nv": {
+        "amount": 53000,
+        "category": "기타",
+        "label": "점심",
+        "time": "12:10",
         "adhoc": true
       }
     }
