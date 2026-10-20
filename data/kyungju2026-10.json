@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-20T05:58:40.669Z",
+  "updatedAt": "2026-10-20T07:15:18.234Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -250,6 +250,13 @@
         "category": "음료",
         "label": "카페",
         "time": "14:58",
+        "adhoc": true
+      },
+      "adhoc_1792480516868_zpra": {
+        "amount": 43680,
+        "category": "교통비",
+        "label": "쏘카주행비",
+        "time": "16:14",
         "adhoc": true
       }
     }
