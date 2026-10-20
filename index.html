@@ -171,6 +171,24 @@
     padding:2px 6px;margin-left:6px;vertical-align:middle;
   }
 
+  /* category summary */
+  .cat-summary{margin-top:22px;}
+  .cat-summary h3{font-size:13.5px;margin:0 0 10px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:6px;}
+  .cat-summary-body{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .donut-wrap{position:relative;flex:0 0 auto;width:132px;height:132px;margin:0 auto;}
+  .donut-wrap svg{width:100%;height:100%;display:block;transform:rotate(-90deg);}
+  .donut-center{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:11px;color:var(--ink-dim);font-weight:600;line-height:1.35;text-align:center;pointer-events:none;
+  }
+  .donut-center b{font-size:13px;color:var(--navy);font-variant-numeric:tabular-nums;}
+  .cat-legend{list-style:none;margin:0;padding:0;flex:1;min-width:170px;}
+  .cat-legend li{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13.5px;}
+  .cat-legend .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
+  .cat-legend .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cat-legend .pct{flex:0 0 auto;font-size:11.5px;color:var(--ink-dim);font-variant-numeric:tabular-nums;min-width:34px;text-align:right;}
+  .cat-legend .amt{flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums;}
+
   /* total */
   .total-day{margin-bottom:18px;}
   .total-day h3{font-size:13.5px;margin:0 0 8px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:6px;}
@@ -1119,10 +1137,42 @@
     }catch(e){ return false; }
   }
 
+  var DONUT_COLORS = ['#ff6b52','#1c2740','#4f7c82','#e8b04a','#8a6fb5','#5fa36a','#d46a9a','#7a8aa0','#b5805a','#3f9ec2'];
+  function renderCategorySummary(catSums, grand){
+    var rows = Object.keys(catSums).map(function(c){ return { name:c, amt:catSums[c] }; })
+      .filter(function(r){ return r.amt > 0; })
+      .sort(function(a,b){ return b.amt - a.amt; });
+    var total = rows.reduce(function(n,r){ return n + r.amt; }, 0);
+    if (!rows.length || !total) return '';
+    var svg = '<svg viewBox="0 0 42 42" role="img" aria-label="항목별 비율 그래프">'
+      + '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#efe9dd" stroke-width="6"></circle>';
+    var cum = 0;
+    rows.forEach(function(r, i){
+      var pct = r.amt / total * 100;
+      r.pct = pct;
+      r.color = DONUT_COLORS[i % DONUT_COLORS.length];
+      svg += '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="'+r.color+'" stroke-width="6"'
+        + ' stroke-dasharray="'+pct.toFixed(3)+' '+(100 - pct).toFixed(3)+'" stroke-dashoffset="'+(-cum).toFixed(3)+'"></circle>';
+      cum += pct;
+    });
+    svg += '</svg>';
+    var h = '<section class="cat-summary"><h3>항목별 합계</h3><div class="cat-summary-body">';
+    h += '<div class="donut-wrap">' + svg + '<div class="donut-center"><span>총</span><b>'+formatWon(total)+'</b></div></div>';
+    h += '<ul class="cat-legend">';
+    rows.forEach(function(r){
+      var pctText = r.pct < 1 ? '<1%' : Math.round(r.pct) + '%';
+      h += '<li><span class="dot" style="background:'+r.color+'"></span><span class="name">'+escapeHtml(r.name)+'</span><span class="pct">'+pctText+'</span><span class="amt">'+formatWon(r.amt)+'</span></li>';
+    });
+    h += '</ul></div></section>';
+    return h;
+  }
+
   function renderTotal(content){
     var html = '';
     var grand = 0;
     var anyDay = false;
+    var catSums = {};
+    function addCat(c, amt){ c = (c && String(c).trim()) || '기타'; catSums[c] = (catSums[c] || 0) + (Number(amt) || 0); }
     state.trip.days.forEach(function(day){
       var dayExp = state.expenses[day.date] || {};
       var entries = Object.keys(dayExp).map(function(k){ return dayExp[k]; }).filter(function(v){ return v && v.amount && !v.skip; });
@@ -1132,6 +1182,7 @@
       html += '<section class="total-day"><h3>'+escapeHtml(day.label)+'</h3><ul>';
       entries.forEach(function(v){
         daySum += Number(v.amount)||0;
+        addCat(v.category, v.amount);
         html += '<li><span class="cat">'+escapeHtml(v.category||'')+'</span><span class="label">'+escapeHtml(v.label)+'</span><span class="amt">'+formatWon(v.amount)+'</span></li>';
       });
       html += '</ul><div class="day-subtotal">소계: '+formatWon(daySum)+'</div></section>';
@@ -1142,6 +1193,7 @@
       html += '<section class="total-day prepaid"><h3>사전 예약·지불 항목</h3><ul>';
       state.prepaid.forEach(function(p){
         preSum += Number(p.amount)||0;
+        addCat(p.category, p.amount);
         html += '<li><span class="cat">'+escapeHtml(p.category||'')+'</span><span class="label">'+escapeHtml(p.name)+'</span><span class="amt">'+formatWon(p.amount)+'</span></li>';
       });
       html += '</ul><div class="day-subtotal">소계: '+formatWon(preSum)+'</div></section>';
@@ -1151,6 +1203,7 @@
       html = '<div class="empty">아직 입력된 경비가 없습니다.<br>일정 화면에서 금액을 입력해 보세요.</div>';
     } else {
       html += '<div class="grand-total"><span>총 합계</span><span>'+formatWon(grand)+'</span></div>';
+      html += renderCategorySummary(catSums, grand);
     }
     content.innerHTML = html;
   }
