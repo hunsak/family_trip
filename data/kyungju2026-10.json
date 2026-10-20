@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-20T04:05:43.606Z",
+  "updatedAt": "2026-10-20T04:16:01.280Z",
   "expenses": {
     "2026-10-18": {
       "adhoc_1792284048307_9741": {
@@ -208,6 +208,13 @@
         "category": "잡화",
         "label": "정아팔찌",
         "time": "13:05",
+        "adhoc": true
+      },
+      "adhoc_1792469759990_v0df": {
+        "amount": 1700,
+        "category": "주차비",
+        "label": "주차비",
+        "time": "13:15",
         "adhoc": true
       }
     }
