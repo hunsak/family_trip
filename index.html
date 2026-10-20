@@ -148,6 +148,24 @@
   .adhoc-form .field{overflow:hidden;}
   .adhoc-form.hidden{display:none;}
   .add-adhoc-btn.hidden{display:none;}
+  .item-head{display:flex;align-items:flex-start;gap:8px;}
+  .item-head .item-text{flex:1;min-width:0;}
+  .skip-btn{
+    flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--ink-dim);font-size:11.5px;font-weight:700;
+    border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap;
+  }
+  .skip-btn:active{background:var(--cream);}
+  .item.skipped{opacity:.55;}
+  .item.skipped .item-text .t{text-decoration:line-through;}
+  .item.skipped .card{background:var(--cream);}
+  .skip-badge{
+    display:inline-block;font-size:10.5px;font-weight:700;color:var(--ink-dim);background:var(--line);border-radius:6px;
+    padding:2px 6px;margin-left:6px;vertical-align:middle;
+  }
+  .adhoc-edit{
+    flex:0 0 auto;background:none;border:none;color:var(--ink-dim);font-size:15px;line-height:1;cursor:pointer;padding:2px 4px;
+  }
+  .adhoc-form .form-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;}
   .now-badge{
     display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--coral);border-radius:6px;
     padding:2px 6px;margin-left:6px;vertical-align:middle;
@@ -858,10 +876,14 @@
     return Object.keys(set);
   }
 
-  function renderDay(content, day){
+  var ADHOC_CATEGORIES = ['교통비','간식비','관람비','주차비','잡화','굿즈','기타'];
+
+  function renderDay(content, day, editId){
     var isToday = day.date === todayStr();
     var now = nowHM();
     var dayExp = state.expenses[day.date] || {};
+    var editing = (editId && dayExp[editId] && dayExp[editId].adhoc) ? dayExp[editId] : null;
+    if (!editing) editId = null;
 
     var scheduleItems = day.items.map(function(item, idx){
       return {
@@ -882,22 +904,34 @@
     var combined = scheduleItems.concat(adhocItems);
     combined.sort(function(a,b){ return a.time.localeCompare(b.time); });
 
+    function isSkipped(it){ var e = dayExp[it.id]; return it.kind === 'schedule' && !!(e && e.skip); }
+
     var currentIdx = -1;
     if (isToday){
-      combined.forEach(function(it, idx){ if (it.time <= now) currentIdx = idx; });
+      combined.forEach(function(it, idx){ if (it.time <= now && !isSkipped(it)) currentIdx = idx; });
     }
 
     var html = '<div class="timeline">';
     combined.forEach(function(item, idx){
-      var cls = 'item' + (item.kind === 'adhoc' ? ' adhoc' : '');
-      if (isToday && idx < currentIdx) cls += ' past';
-      if (isToday && idx === currentIdx) cls += ' current';
+      var skipped = isSkipped(item);
+      var cls = 'item' + (item.kind === 'adhoc' ? ' adhoc' : '') + (skipped ? ' skipped' : '');
+      if (!skipped && isToday && idx < currentIdx) cls += ' past';
+      if (!skipped && isToday && idx === currentIdx) cls += ' current';
       var savedEntry = dayExp[item.id];
       var amount = savedEntry ? savedEntry.amount : '';
       html += '<div class="'+cls+'">';
       html += '<div class="time">'+item.time+'</div>';
       html += '<div class="card">';
-      html += '<div class="item-text">'+escapeHtml(item.text)+(item.kind==='adhoc' ? '<span class="adhoc-badge">즉흥 지출</span>' : '')+(isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')+'</div>';
+      html += '<div class="item-head">';
+      html += '<div class="item-text"><span class="t">'+escapeHtml(item.text)+'</span>'
+        + (item.kind==='adhoc' ? '<span class="adhoc-badge">즉흥 지출</span>' : '')
+        + (skipped ? '<span class="skip-badge">건너뜀</span>' : '')
+        + (!skipped && isToday && idx===currentIdx ? '<span class="now-badge">지금</span>' : '')
+        + '</div>';
+      if (item.kind === 'schedule'){
+        html += '<button class="skip-btn" data-date="'+day.date+'" data-id="'+item.id+'" data-cat="'+escapeHtml(item.category||'')+'" data-label="'+escapeHtml(item.text)+'">'+(skipped ? '되돌리기' : '건너뛰기')+'</button>';
+      }
+      html += '</div>';
       if (item.address){
         html += '<div class="addr-row" data-addr="'+escapeHtml(item.address)+'">';
         html += '<span class="addr-icon">\uD83D\uDCCD</span><span class="addr-text">'+escapeHtml(item.address)+'</span><span class="addr-copy">복사</span>';
@@ -908,9 +942,10 @@
         html += '<span class="tag">'+escapeHtml(item.category||'기타')+'</span>';
         html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+item.id+'" data-cat="'+escapeHtml(item.category||'기타')+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
         html += '<span class="won">원</span>';
+        html += '<button class="adhoc-edit" data-id="'+item.id+'" title="수정">\u270E</button>';
         html += '<button class="adhoc-del" data-date="'+day.date+'" data-id="'+item.id+'" title="삭제">×</button>';
         html += '</div>';
-      } else if (item.category){
+      } else if (item.category && !skipped){
         html += '<div class="cost-row">';
         html += '<span class="tag">'+escapeHtml(item.category)+'</span>';
         html += '<input type="number" inputmode="numeric" placeholder="0" data-date="'+day.date+'" data-id="'+item.id+'" data-cat="'+escapeHtml(item.category)+'" data-label="'+escapeHtml(item.text)+'" value="'+(amount||'')+'">';
@@ -921,14 +956,23 @@
     });
     html += '</div>';
 
-    html += '<button class="add-adhoc-btn" id="addAdhocBtn">+ 예정에 없던 지출 추가</button>';
-    html += '<div class="adhoc-form hidden" id="adhocForm">';
-    html += '  <div class="field"><label>시간</label><input type="text" inputmode="numeric" id="adhocTime" placeholder="09:30" maxlength="5" value="'+nowHM()+'"></div>';
-    html += '  <div class="field"><label>내용</label><input type="text" id="adhocText" placeholder="예: 편의점 간식"></div>';
-    html += '  <div class="field"><label>구분</label><input type="text" id="adhocCat" list="categoryOptions" placeholder="예: 식비" value="기타"></div>';
-    html += '  <div class="field"><label>금액(원)</label><input type="number" inputmode="numeric" id="adhocAmount" placeholder="0"></div>';
-    html += '  <datalist id="categoryOptions">' + collectKnownCategories().map(function(c){ return '<option value="'+escapeHtml(c)+'">'; }).join('') + '</datalist>';
-    html += '  <div class="btn-row"><button class="btn btn-accent" id="adhocSaveBtn">저장</button><button class="btn btn-ghost" id="adhocCancelBtn">취소</button></div>';
+    var fTime = editing ? (editing.time || nowHM()) : nowHM();
+    var fText = editing ? (editing.label || '') : '';
+    var fCat = editing ? (editing.category || '기타') : '기타';
+    var fAmt = (editing && editing.amount) ? editing.amount : '';
+    var catList = ADHOC_CATEGORIES.slice();
+    if (catList.indexOf(fCat) < 0) catList.push(fCat);   // 예전에 입력한 구분도 수정 화면에서 유지
+
+    html += '<button class="add-adhoc-btn'+(editing ? ' hidden' : '')+'" id="addAdhocBtn">+ 예정에 없던 지출 추가</button>';
+    html += '<div class="adhoc-form'+(editing ? '' : ' hidden')+'" id="adhocForm">';
+    html += '  <div class="form-title">'+(editing ? '지출 수정' : '예정에 없던 지출 추가')+'</div>';
+    html += '  <div class="field"><label>시간</label><input type="text" inputmode="numeric" id="adhocTime" placeholder="09:30" maxlength="5" value="'+escapeHtml(fTime)+'"></div>';
+    html += '  <div class="field"><label>내용</label><input type="text" id="adhocText" placeholder="예: 편의점 간식" value="'+escapeHtml(fText)+'"></div>';
+    html += '  <div class="field"><label>구분</label><select id="adhocCat">'
+      + catList.map(function(c){ return '<option value="'+escapeHtml(c)+'"'+(c === fCat ? ' selected' : '')+'>'+escapeHtml(c)+'</option>'; }).join('')
+      + '</select></div>';
+    html += '  <div class="field"><label>금액(원)</label><input type="number" inputmode="numeric" id="adhocAmount" placeholder="0" value="'+fAmt+'"></div>';
+    html += '  <div class="btn-row"><button class="btn btn-accent" id="adhocSaveBtn">'+(editing ? '수정 저장' : '저장')+'</button><button class="btn btn-ghost" id="adhocCancelBtn">취소</button></div>';
     html += '</div>';
 
     content.innerHTML = html;
@@ -940,18 +984,12 @@
         var val = inp.value === '' ? null : Number(inp.value);
         state.expenses[date] = state.expenses[date] || {};
         var existing = state.expenses[date][id];
-        if (val === null || isNaN(val) || val === 0){
-          if (existing && existing.adhoc){
-            existing.amount = 0; // keep the entry (label/time/category) but zero amount; user can delete via × if unwanted
-          } else {
-            delete state.expenses[date][id];
-          }
-        } else {
-          if (existing && existing.adhoc){
-            existing.amount = val;
-          } else {
-            state.expenses[date][id] = { amount: val, category: cat, label: label };
-          }
+        var zero = (val === null || isNaN(val) || val === 0);
+        if (existing){
+          existing.amount = zero ? 0 : val;
+          if (zero && !existing.adhoc && !existing.skip) delete state.expenses[date][id];
+        } else if (!zero){
+          state.expenses[date][id] = { amount: val, category: cat, label: label };
         }
         scheduleSave();
       });
@@ -964,6 +1002,28 @@
         scheduleSave();
         renderDay(content, day);
       });
+    });
+
+    content.querySelectorAll('.skip-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var date = btn.dataset.date, id = btn.dataset.id;
+        state.expenses[date] = state.expenses[date] || {};
+        var e = state.expenses[date][id];
+        if (e && e.skip){
+          delete e.skip;
+          if (!e.amount && !e.adhoc) delete state.expenses[date][id];
+        } else if (e){
+          e.skip = true;
+        } else {
+          state.expenses[date][id] = { amount: 0, category: btn.dataset.cat || '', label: btn.dataset.label, skip: true };
+        }
+        scheduleSave();
+        renderDay(content, day);
+      });
+    });
+
+    content.querySelectorAll('.adhoc-edit').forEach(function(btn){
+      btn.addEventListener('click', function(){ renderDay(content, day, btn.dataset.id); });
     });
 
     content.querySelectorAll('.addr-row').forEach(function(row){
@@ -1004,6 +1064,10 @@
         }, 400);
       });
     }
+    if (editId && form){
+      setTimeout(function(){ form.scrollIntoView({ behavior:'smooth', block:'center' }); }, 50);
+      setTimeout(function(){ form.scrollIntoView({ behavior:'smooth', block:'center' }); }, 400);
+    }
     var cancelBtn = content.querySelector('#adhocCancelBtn');
     if (cancelBtn){
       cancelBtn.addEventListener('click', function(){ renderDay(content, day); });
@@ -1012,7 +1076,7 @@
     if (saveBtn){
       saveBtn.addEventListener('click', function(){
         var rawTime = content.querySelector('#adhocTime').value.trim();
-        var time = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : nowHM();
+        var time = /^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime) ? rawTime : ((editing && editing.time) || nowHM());
         var text = content.querySelector('#adhocText').value.trim();
         var cat = content.querySelector('#adhocCat').value.trim() || '기타';
         var amount = Number(content.querySelector('#adhocAmount').value) || 0;
@@ -1020,9 +1084,14 @@
           content.querySelector('#adhocText').focus();
           return;
         }
-        var id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
         state.expenses[day.date] = state.expenses[day.date] || {};
-        state.expenses[day.date][id] = { amount: amount, category: cat, label: text, time: time, adhoc: true };
+        var target = editId ? state.expenses[day.date][editId] : null;
+        if (target){
+          target.amount = amount; target.category = cat; target.label = text; target.time = time;
+        } else {
+          var id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+          state.expenses[day.date][id] = { amount: amount, category: cat, label: text, time: time, adhoc: true };
+        }
         scheduleSave();
         renderDay(content, day);
       });
@@ -1056,7 +1125,7 @@
     var anyDay = false;
     state.trip.days.forEach(function(day){
       var dayExp = state.expenses[day.date] || {};
-      var entries = Object.keys(dayExp).map(function(k){ return dayExp[k]; }).filter(function(v){ return v && v.amount; });
+      var entries = Object.keys(dayExp).map(function(k){ return dayExp[k]; }).filter(function(v){ return v && v.amount && !v.skip; });
       if (!entries.length) return;
       anyDay = true;
       var daySum = 0;
