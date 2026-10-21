@@ -171,6 +171,15 @@
     padding:2px 6px;margin-left:6px;vertical-align:middle;
   }
 
+  /* background image */
+  #bgLayer{position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;display:none;pointer-events:none;overflow:hidden;}
+  #bgLayer img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block;}
+  #bgVeil{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--cream);}
+  body.has-bg{background:transparent;--card:rgba(255,255,255,.93);}
+  .bg-preview{width:100%;height:110px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--cream);margin:8px 0;display:none;}
+  .bg-slider-row{display:flex;align-items:center;gap:10px;margin:10px 0 4px;font-size:13px;}
+  .bg-slider-row input[type=range]{flex:1;min-width:0;}
+  .bg-slider-row .val{flex:0 0 40px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim);}
   /* category manage */
   .cm-title{font-size:15px;margin:4px 0 4px;color:var(--navy);}
   .cm-desc{font-size:12.5px;color:var(--ink-dim);margin:0 0 12px;line-height:1.5;}
@@ -293,6 +302,7 @@
 </style>
 </head>
 <body>
+<div id="bgLayer"><img id="bgImg" alt=""><div id="bgVeil"></div></div>
 
 <header id="appHeader">
   <div>
@@ -353,6 +363,16 @@
       <div id="prepaidList"></div>
       <button class="btn btn-ghost" id="addPrepaidBtn">+ 항목 추가</button>
     </div>
+
+    <div class="section-block">
+      <h3>4. 배경 이미지</h3>
+      <p class="hint">여행 사진을 배경으로 깔 수 있어요. 사진은 <b>이 기기에만</b> 저장되고 GitHub나 다른 가족 기기에는 올라가지 않습니다. 기기마다 따로 지정하세요.</p>
+      <input type="file" id="bgFileInput" accept="image/*">
+      <img class="bg-preview" id="bgPreview" alt="배경 미리보기">
+      <div class="bg-slider-row"><span>배경 흐리게</span><input type="range" id="bgDim" min="0" max="90" step="5" value="55"><span class="val" id="bgDimVal">55%</span></div>
+      <div class="hint" id="bgMsg"></div>
+      <div class="btn-row"><button class="btn btn-ghost" id="bgRemoveBtn">배경 제거</button></div>
+    </div>
   </div>
 </div>
 
@@ -363,6 +383,8 @@
   var LS_MD = 'trip_md_raw';
   var LS_CFG = 'trip_github_cfg';
   var LS_EXPENSES = 'trip_expenses_cache';   // { [tripId]: {expenses, prepaid, packing} }
+  var LS_BG = 'trip_bg_img';       // 배경 사진 (이 기기에만 저장, 동기화 안 함)
+  var LS_BG_DIM = 'trip_bg_dim';
 
   var state = {
     trip: { title:'여행일지', id:'trip', days:[], packing:[] },
@@ -1441,6 +1463,97 @@
     setSyncStatus('GitHub 설정 저장됨');
   };
 
+  // ---------- 배경 이미지 (기기별 저장) ----------
+  function getBgDim(){
+    var d = NaN;
+    try{ d = parseInt(localStorage.getItem(LS_BG_DIM), 10); }catch(e){}
+    return isNaN(d) ? 55 : Math.max(0, Math.min(90, d));
+  }
+  function applyBackground(){
+    var img = null;
+    try{ img = localStorage.getItem(LS_BG); }catch(e){}
+    var dim = getBgDim();
+    var layer = document.getElementById('bgLayer');
+    var bgImg = document.getElementById('bgImg');
+    var veil = document.getElementById('bgVeil');
+    var preview = document.getElementById('bgPreview');
+    var slider = document.getElementById('bgDim');
+    if (slider) slider.value = String(dim);
+    var val = document.getElementById('bgDimVal');
+    if (val) val.textContent = dim + '%';
+    if (img){
+      if (bgImg.getAttribute('src') !== img) bgImg.setAttribute('src', img);
+      veil.style.opacity = String(dim / 100);
+      layer.style.display = 'block';
+      document.body.classList.add('has-bg');
+      if (preview){ if (preview.getAttribute('src') !== img) preview.setAttribute('src', img); preview.style.display = 'block'; }
+    } else {
+      bgImg.removeAttribute('src');
+      layer.style.display = 'none';
+      document.body.classList.remove('has-bg');
+      if (preview){ preview.removeAttribute('src'); preview.style.display = 'none'; }
+    }
+  }
+  // 큰 사진은 화면에 맞게 줄여서(긴 변 최대 1600px) 저장 공간을 아낌
+  function fileToBackground(file){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var tries = [[1600, 0.8], [1280, 0.7], [960, 0.6]];
+          var out = null;
+          for (var i = 0; i < tries.length; i++){
+            var max = tries[i][0], q = tries[i][1];
+            var w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height;
+            var scale = Math.min(1, max / Math.max(w0, h0));
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(w0 * scale));
+            canvas.height = Math.max(1, Math.round(h0 * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            out = canvas.toDataURL('image/jpeg', q);
+            if (out.length < 2000000) break;
+          }
+          URL.revokeObjectURL(url);
+          resolve(out);
+        }catch(e){ URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없어요.')); };
+      img.src = url;
+    });
+  }
+  (function setupBackgroundUI(){
+    var msg = document.getElementById('bgMsg');
+    function say(t){ msg.textContent = t || ''; }
+    var fileInput = document.getElementById('bgFileInput');
+    fileInput.addEventListener('change', function(){
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      say('사진 처리 중...');
+      fileToBackground(f).then(function(dataUrl){
+        try{
+          localStorage.setItem(LS_BG, dataUrl);
+        }catch(e){
+          say('저장 공간이 부족해요. 더 작은 사진을 골라 주세요.');
+          return;
+        }
+        applyBackground();
+        say('배경이 적용됐어요.');
+      }).catch(function(err){
+        say('사진을 불러오지 못했어요: ' + err.message);
+      }).then(function(){ fileInput.value = ''; });
+    });
+    document.getElementById('bgDim').addEventListener('input', function(e){
+      try{ localStorage.setItem(LS_BG_DIM, String(e.target.value)); }catch(err){}
+      applyBackground();
+    });
+    document.getElementById('bgRemoveBtn').addEventListener('click', function(){
+      try{ localStorage.removeItem(LS_BG); }catch(e){}
+      applyBackground();
+      say('배경을 제거했어요.');
+    });
+  })();
+
   document.getElementById('syncNowBtn').onclick = function(){
     manualSync();
   };
@@ -1465,6 +1578,7 @@
 
   // ---------- boot ----------
   loadLocal();
+  applyBackground();
   state.selected = pickInitialSelected();
   renderTabs();
   renderCurrentView();
