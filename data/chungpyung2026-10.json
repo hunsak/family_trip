@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-10-21T13:45:20.770Z",
+  "updatedAt": "2026-10-21T13:46:01.012Z",
   "expenses": {},
   "prepaid": [
     {
       "id": "p_wgawa5c",
-      "name": "",
+      "name": "숙박비",
       "category": "",
       "amount": 0
     }
