@@ -171,6 +171,19 @@
     padding:2px 6px;margin-left:6px;vertical-align:middle;
   }
 
+  /* category manage */
+  .cm-title{font-size:15px;margin:4px 0 4px;color:var(--navy);}
+  .cm-desc{font-size:12.5px;color:var(--ink-dim);margin:0 0 12px;line-height:1.5;}
+  .cm-list{list-style:none;margin:0 0 14px;padding:0;}
+  .cm-list li{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+  .cm-name{flex:1;min-width:0;font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cm-count{flex:0 0 auto;font-size:11.5px;color:var(--ink-dim);}
+  .cm-btn{flex:0 0 auto;background:none;border:none;color:var(--ink-dim);font-size:17px;line-height:1;cursor:pointer;padding:4px 6px;}
+  .cm-input{flex:1;min-width:0;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-family:inherit;}
+  .cm-small{flex:0 0 auto;font-size:12.5px;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);}
+  .cm-small.primary{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .cm-add{display:flex;gap:8px;}
+  .cm-msg{min-height:18px;font-size:12.5px;color:var(--coral);margin:8px 2px 0;}
   /* category summary */
   .cat-summary{margin-top:22px;}
   .cat-summary h3{font-size:13.5px;margin:0 0 10px;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:6px;}
@@ -356,7 +369,8 @@
     expenses: {},      // { date: { itemId: {amount, category, label} } }
     prepaid: [],        // [{id, name, category, amount}]
     packing: {},         // { idx: true/false/'skip' } - 체크 상태, GitHub로 공유됨
-    base: { expenses:{}, prepaid:[], packing:{} },  // 마지막으로 서버와 맞춰본 시점의 값(내 변경분 계산용)
+    categories: [],      // [{id,name}] 즉흥 지출 구분 목록, 비어 있으면 기본 목록 사용 (GitHub로 공유됨)
+    base: { expenses:{}, prepaid:[], packing:{}, categories:[] },  // 마지막으로 서버와 맞춰본 시점의 값(내 변경분 계산용)
     github: { owner:'', repo:'', branch:'main', folder:'data', token:'' },
     githubSha: null,
     selected: null       // date string, "__TOTAL__", or "__PACKING__"
@@ -497,18 +511,20 @@
       state.expenses = (entry && entry.expenses) || {};
       state.prepaid = (entry && entry.prepaid) || [];
       state.packing = (entry && entry.packing) || {};
+      state.categories = (entry && entry.categories) || [];
       state.base = (entry && entry.base) ? entry.base : snapshotClone();
     }catch(e){
       state.expenses = {};
       state.prepaid = [];
       state.packing = {};
-      state.base = { expenses:{}, prepaid:[], packing:{} };
+      state.categories = [];
+      state.base = { expenses:{}, prepaid:[], packing:{}, categories:[] };
     }
   }
   function cacheExpensesLocally(){
     var all = {};
     try{ all = JSON.parse(localStorage.getItem(LS_EXPENSES) || '{}'); }catch(e){}
-    all[state.trip.id] = { expenses: state.expenses, prepaid: state.prepaid, packing: state.packing, base: state.base };
+    all[state.trip.id] = { expenses: state.expenses, prepaid: state.prepaid, packing: state.packing, categories: state.categories, base: state.base };
     localStorage.setItem(LS_EXPENSES, JSON.stringify(all));
   }
 
@@ -622,12 +638,13 @@
     return {
       expenses: mergeExpenses(base.expenses, local.expenses, remote.expenses),
       prepaid: mergePrepaid(base.prepaid, local.prepaid, remote.prepaid),
-      packing: mergeMap(base.packing, local.packing, remote.packing)
+      packing: mergeMap(base.packing, local.packing, remote.packing),
+      categories: mergePrepaid(base.categories, local.categories, remote.categories)
     };
   }
   // END-MERGE
 
-  function snapshotState(){ return { expenses: state.expenses, prepaid: state.prepaid, packing: state.packing }; }
+  function snapshotState(){ return { expenses: state.expenses, prepaid: state.prepaid, packing: state.packing, categories: state.categories }; }
   function snapshotClone(){ return clone(snapshotState()); }
   function hasPendingChanges(){
     var withLocal = threeWay(state.base, snapshotState(), state.base);
@@ -664,7 +681,8 @@
     state.expenses = merged.expenses;
     state.prepaid = merged.prepaid;
     state.packing = merged.packing;
-    state.base = clone({ expenses: remote.expenses || {}, prepaid: remote.prepaid || [], packing: remote.packing || {} });
+    state.categories = merged.categories;
+    state.base = clone({ expenses: remote.expenses || {}, prepaid: remote.prepaid || [], packing: remote.packing || {}, categories: remote.categories || [] });
     epoch++;
     cacheExpensesLocally();
     if (stable(snapshotState()) !== before) needsRender = true;
@@ -737,7 +755,7 @@
     return githubGet().then(function(remote){
       var remoteSnap = remote || snapshotClone();
       var merged = threeWay(state.base, snapshotState(), remoteSnap);
-      var payload = { updatedAt: new Date().toISOString(), expenses: merged.expenses, prepaid: merged.prepaid, packing: merged.packing };
+      var payload = { updatedAt: new Date().toISOString(), expenses: merged.expenses, prepaid: merged.prepaid, packing: merged.packing, categories: merged.categories };
       return githubPut(payload).then(function(){ return payload; });
     }).then(function(payload){
       adoptRemote(payload);
@@ -770,6 +788,11 @@
     totalBtn.textContent = '총금액';
     totalBtn.onclick = function(){ state.selected = '__TOTAL__'; renderTabs(); renderCurrentView(); };
     wrap.appendChild(totalBtn);
+    var catBtn = document.createElement('button');
+    catBtn.className = 'date-tab total-tab' + (state.selected === '__CATS__' ? ' active' : '');
+    catBtn.textContent = '구분';
+    catBtn.onclick = function(){ state.selected = '__CATS__'; editingCatId = null; renderTabs(); renderCurrentView(); };
+    wrap.appendChild(catBtn);
   }
 
   function pickInitialSelected(){
@@ -800,6 +823,10 @@
     }
     if (state.selected === '__PACKING__'){
       renderPacking(content);
+      return;
+    }
+    if (state.selected === '__CATS__'){
+      renderCategories(content);
       return;
     }
     var day = hasDays ? state.trip.days.find(function(d){ return d.date === state.selected; }) : null;
@@ -896,6 +923,121 @@
 
   var ADHOC_CATEGORIES = ['교통비','간식비','관람비','주차비','잡화','굿즈','기타'];
 
+  function getCategories(){
+    if (state.categories && state.categories.length) return state.categories;
+    return ADHOC_CATEGORIES.map(function(n, i){ return { id: 'd' + i, name: n }; });
+  }
+  function ensureCategories(){
+    if (!state.categories || !state.categories.length){
+      state.categories = ADHOC_CATEGORIES.map(function(n, i){ return { id: 'd' + i, name: n }; });
+    }
+  }
+  function categoryUsage(name){
+    var n = 0;
+    Object.keys(state.expenses).forEach(function(d){
+      var day = state.expenses[d] || {};
+      Object.keys(day).forEach(function(id){ if (day[id] && day[id].adhoc && day[id].category === name) n++; });
+    });
+    return n;
+  }
+  var editingCatId = null;
+
+  function renderCategories(content){
+    var cats = getCategories();
+    var html = '<div class="cat-manage">';
+    html += '<h3 class="cm-title">즉흥 지출 구분</h3>';
+    html += '<p class="cm-desc">예정에 없던 지출을 추가할 때 고르는 구분이에요. 가족 모두에게 공유됩니다.</p>';
+    html += '<ul class="cm-list">';
+    cats.forEach(function(c){
+      if (c.id === editingCatId){
+        html += '<li data-id="'+c.id+'"><input class="cm-input" id="cmEdit" maxlength="12" value="'+escapeHtml(c.name)+'">'
+          + '<button class="cm-small primary" data-act="save">저장</button><button class="cm-small" data-act="cancel">취소</button></li>';
+      } else {
+        var used = categoryUsage(c.name);
+        html += '<li data-id="'+c.id+'"><span class="cm-name">'+escapeHtml(c.name)+'</span>'
+          + (used ? '<span class="cm-count">'+used+'건</span>' : '')
+          + '<button class="cm-btn" data-act="edit" title="이름 수정">\u270E</button>'
+          + '<button class="cm-btn" data-act="del" title="삭제">×</button></li>';
+      }
+    });
+    html += '</ul>';
+    html += '<div class="cm-add"><input class="cm-input" id="cmNew" maxlength="12" placeholder="새 구분 이름 (예: 선물)"><button class="cm-small primary" id="cmAddBtn">추가</button></div>';
+    html += '<div class="cm-msg" id="cmMsg"></div>';
+    html += '</div>';
+    content.innerHTML = html;
+
+    var msg = content.querySelector('#cmMsg');
+    function say(t){ msg.textContent = t || ''; }
+    function nameTaken(name, exceptId){
+      return getCategories().some(function(c){ return c.id !== exceptId && c.name === name; });
+    }
+
+    function addCat(){
+      var inp = content.querySelector('#cmNew');
+      var name = inp.value.trim();
+      if (!name){ say('구분 이름을 입력해 주세요.'); return; }
+      if (nameTaken(name)){ say('이미 있는 구분이에요.'); return; }
+      ensureCategories();
+      state.categories.push({ id: 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5), name: name });
+      scheduleSave();
+      renderCategories(content);
+    }
+    content.querySelector('#cmAddBtn').addEventListener('click', addCat);
+    content.querySelector('#cmNew').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); addCat(); } });
+
+    function saveRename(id){
+      var name = content.querySelector('#cmEdit').value.trim();
+      var current = getCategories().filter(function(c){ return c.id === id; })[0];
+      if (!current) { editingCatId = null; renderCategories(content); return; }
+      if (!name){ say('구분 이름을 입력해 주세요.'); return; }
+      if (name === current.name){ editingCatId = null; renderCategories(content); return; }
+      if (nameTaken(name, id)){ say('이미 있는 구분이에요.'); return; }
+      var oldName = current.name;
+      ensureCategories();
+      state.categories.forEach(function(c){ if (c.id === id) c.name = name; });
+      // 이미 입력한 즉흥 지출도 새 이름으로 맞춰줌
+      Object.keys(state.expenses).forEach(function(d){
+        var day = state.expenses[d] || {};
+        Object.keys(day).forEach(function(eid){
+          if (day[eid] && day[eid].adhoc && day[eid].category === oldName) day[eid].category = name;
+        });
+      });
+      editingCatId = null;
+      scheduleSave();
+      renderCategories(content);
+    }
+
+    content.querySelectorAll('.cm-list li').forEach(function(li){
+      var id = li.dataset.id;
+      li.querySelectorAll('[data-act]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var act = btn.dataset.act;
+          if (act === 'edit'){
+            editingCatId = id; renderCategories(content);
+            var ed = content.querySelector('#cmEdit'); if (ed){ ed.focus(); ed.select(); }
+          } else if (act === 'cancel'){
+            editingCatId = null; renderCategories(content);
+          } else if (act === 'save'){
+            saveRename(id);
+          } else if (act === 'del'){
+            if (getCategories().length <= 1){ say('구분은 최소 1개 필요해요.'); return; }
+            var cur = getCategories().filter(function(c){ return c.id === id; })[0];
+            if (!cur) return;
+            var used = categoryUsage(cur.name);
+            var ask = '"' + cur.name + '" 구분을 삭제할까요?' + (used ? '\n이미 입력한 ' + used + '건의 지출은 그대로 남아요.' : '');
+            if (!window.confirm(ask)) return;
+            ensureCategories();
+            state.categories = state.categories.filter(function(c){ return c.id !== id; });
+            scheduleSave();
+            renderCategories(content);
+          }
+        });
+      });
+    });
+    var edIn = content.querySelector('#cmEdit');
+    if (edIn) edIn.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); saveRename(editingCatId); } });
+  }
+
   function renderDay(content, day, editId){
     var isToday = day.date === todayStr();
     var now = nowHM();
@@ -976,9 +1118,9 @@
 
     var fTime = editing ? (editing.time || nowHM()) : nowHM();
     var fText = editing ? (editing.label || '') : '';
-    var fCat = editing ? (editing.category || '기타') : '기타';
+    var fCat = editing ? (editing.category || '기타') : (getCategories().some(function(c){ return c.name === '기타'; }) ? '기타' : getCategories()[0].name);
     var fAmt = (editing && editing.amount) ? editing.amount : '';
-    var catList = ADHOC_CATEGORIES.slice();
+    var catList = getCategories().map(function(c){ return c.name; });
     if (catList.indexOf(fCat) < 0) catList.push(fCat);   // 예전에 입력한 구분도 수정 화면에서 유지
 
     html += '<button class="add-adhoc-btn'+(editing ? ' hidden' : '')+'" id="addAdhocBtn">+ 예정에 없던 지출 추가</button>';
@@ -1355,7 +1497,7 @@
 
   setInterval(function(){
     renderIfNeeded();
-    if (state.selected && state.selected !== '__TOTAL__' && !isEditingNow()) renderCurrentView();
+    if (state.selected && state.selected !== '__TOTAL__' && state.selected !== '__CATS__' && !isEditingNow()) renderCurrentView();
   }, 30000);
 
 })();
